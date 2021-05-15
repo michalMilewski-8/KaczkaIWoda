@@ -146,7 +146,6 @@ namespace mini::gk2
 		ParticleSystem m_particles;
 
 		std::vector<std::vector<float>> heightMap;
-		std::vector<std::vector<float>> heightMapNew;
 		std::vector<std::vector<float>> heightMapOld;
 		std::vector<std::vector<float>> d;
 		std::vector<BYTE> normalMap;

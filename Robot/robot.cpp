@@ -108,7 +108,6 @@ Robot::Robot(HINSTANCE hInstance)
 
 	d = vector<vector<float>>(Nsize);
 	heightMap = vector<vector<float>>(Nsize);
-	heightMapNew = vector<vector<float>>(Nsize);
 	heightMapOld = vector<vector<float>>(Nsize);
 	normalMap = vector<BYTE>(arraySize);
 
@@ -116,10 +115,8 @@ Robot::Robot(HINSTANCE hInstance)
 		d[i] = vector<float>(Nsize);
 		heightMap[i] = vector<float>(Nsize);
 		heightMapOld[i] = vector<float>(Nsize);
-		heightMapNew[i] = vector<float>(Nsize);
 		for (int j = 0; j < Nsize; j++) {
 			heightMap[i][j] = 0.0f;
-			heightMapNew[i][j] = 0.0f;
 			heightMapOld[i][j] = 0.0f;
 
 			float scaledi = ((i / (float)(Nsize - 1) * SHEET_SIZE) - SHEET_SIZE / 2.0f);
@@ -378,19 +375,14 @@ void Robot::GenerateHeightMap()
 				zjp = 0.0f;
 			else
 				zjp = heightMap[i][j + 1];
-			heightMapNew[i][j] = d[i][j] * (A * (zip + zim + zjp + zjm) + B * heightMap[i][j] - heightMapOld[i][j]);
+			heightMapOld[i][j] = d[i][j] * (A * (zip + zim + zjp + zjm) + B * heightMap[i][j] - heightMapOld[i][j]);
 
 			if (rand() % 100000 < 1 && rand() % 20 < 3)
-				heightMapNew[i][j] += 0.25f;
+				heightMapOld[i][j] += 0.25f;
 		}
 	}
 
-	for (int i = 0; i < Nsize; i++) {
-		for (int j = 0; j < Nsize; j++) {
-			heightMapOld[i][j] = heightMap[i][j];
-			heightMap[i][j] = heightMapNew[i][j];
-		}
-	}
+	std::swap(heightMapOld, heightMap);
 
 	auto dnorm = normalMap.data();
 	for (int i = 0; i < Nsize; i++) {
@@ -427,7 +419,7 @@ void Robot::GenerateHeightMap()
 			XMFLOAT3 normalny;
 			XMStoreFloat3(&normalny, normal);
 
-			*(dnorm++) = static_cast<BYTE>((normalny.x+1.0f)/2.0f * 255.0f);
+			*(dnorm++) = static_cast<BYTE>((normalny.x + 1.0f)/2.0f * 255.0f);
 			*(dnorm++) = static_cast<BYTE>((normalny.y + 1.0f) / 2.0f * 255.0f);
 			*(dnorm++) = static_cast<BYTE>((normalny.z + 1.0f) / 2.0f * 255.0f);
 			*(dnorm++) = 255;
