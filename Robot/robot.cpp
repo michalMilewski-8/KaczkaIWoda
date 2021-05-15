@@ -127,7 +127,7 @@ Robot::Robot(HINSTANCE hInstance)
 			XMFLOAT2 curr = { scaledi ,scaledj };
 			float l = min(abs(SHEET_SIZE / 2.0f - curr.x), min(abs(curr.x + SHEET_SIZE / 2.0f), min(abs(SHEET_SIZE / 2.0f - curr.y), abs(curr.y + SHEET_SIZE / 2.0f))));
 			l *= 5.0f;
-			d[i][j] = 0.7f * min(1.0f, l);
+			d[i][j] = 0.95f * min(1.0f, l);
 		}
 	}
 
@@ -451,7 +451,7 @@ void Robot::Render()
 	Base::Render();
 	GenerateHeightMap();
 	SetShaders(m_textureVS, m_texturePS);
-	SetTextures({ m_waterTexture.get() }, m_samplerWrap);
+	SetTextures({ m_waterTexture.get(), m_cubeTexture.get() }, m_samplerWrap);
 	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f));
 	DrawSheet(true);
 
