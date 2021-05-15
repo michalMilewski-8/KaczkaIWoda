@@ -18,11 +18,11 @@ const float Robot::CIRCLE_RADIUS = 0.5f;
 
 const float Robot::SHEET_ANGLE = DirectX::XM_PIDIV4;
 const float Robot::SHEET_SIZE = 2.0f;
-const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -0.5f, 1.0f);
+const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -0.5f, 0.0f);
 const XMFLOAT4 Robot::SHEET_COLOR = XMFLOAT4(1.0f, 1.0f, 1.0f, 255.0f / 255.0f);
 
 const float Robot::WALL_SIZE = 2.0f;
-const XMFLOAT3 Robot::WALLS_POS = XMFLOAT3(0.0f, 0.0f, 1.0f);
+const XMFLOAT3 Robot::WALLS_POS = XMFLOAT3(0.0f, 0.0f, 0.0f);
 const XMFLOAT4 LightPos = XMFLOAT4(0.0f, 0.5f, 1.0f, 1.0f);
 
 #pragma endregion
@@ -58,15 +58,17 @@ Robot::Robot(HINSTANCE hInstance)
 	sd.MaxAnisotropy = 16;
 
 	m_samplerWrap = m_device.CreateSamplerState(sd);
-	sd.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+
+	SamplerDescription sd2;
+	/*sd.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
 	sd.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
 	sd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
 	sd.BorderColor[0] = 0.0f;
 	sd.BorderColor[1] = 0.0f;
 	sd.BorderColor[2] = 0.0f;
 	sd.BorderColor[3] = 0.0f;
-	sd.MipLODBias = 0.5f;
-	m_samplerWrap_back = m_device.CreateSamplerState(sd);
+	sd.MipLODBias = 0.5f;*/
+	m_samplerWrap_back = m_device.CreateSamplerState(sd2);
 
 	//Camera Plane
 	SetCameraPlane();
@@ -125,7 +127,7 @@ Robot::Robot(HINSTANCE hInstance)
 			XMFLOAT2 curr = { scaledi ,scaledj };
 			float l = min(abs(SHEET_SIZE / 2.0f - curr.x), min(abs(curr.x + SHEET_SIZE / 2.0f), min(abs(SHEET_SIZE / 2.0f - curr.y), abs(curr.y + SHEET_SIZE / 2.0f))));
 			l *= 5.0f;
-			d[i][j] = 0.8f * min(1.0f, l);
+			d[i][j] = 0.7f * min(1.0f, l);
 		}
 	}
 
@@ -134,6 +136,8 @@ Robot::Robot(HINSTANCE hInstance)
 	texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
 	waterTex = m_device.CreateTexture(texDesc);
 	m_waterTexture = m_device.CreateShaderResourceView(waterTex);
+
+	m_cubeTexture = m_device.CreateShaderResourceView(L"resources/textures/cubeMap.dds");
 }
 
 void Robot::CreateRenderStates()
@@ -350,10 +354,6 @@ void Robot::DrawMirroredWorld(unsigned int i)
 
 void Robot::SetCameraPlane()
 {
-	auto camPos = m_camera.getCameraPosition();
-	XMFLOAT4 camDir;
-	XMStoreFloat4(&camDir, m_camera.getForwardDir());
-	UpdatePlaneCB(camPos, camDir);
 }
 void Robot::GenerateHeightMap()
 {
@@ -456,6 +456,7 @@ void Robot::Render()
 	DrawSheet(true);
 
 	SetShaders();
+	SetTextures({ m_cubeTexture.get() }, m_samplerWrap_back);
 	Set1Light(LightPos);
 	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f));
 	DrawWalls();

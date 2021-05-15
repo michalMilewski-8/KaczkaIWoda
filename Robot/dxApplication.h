@@ -59,7 +59,7 @@ namespace mini
 		static constexpr float MOVEMENT_SPEED = 4.0f;
 		static constexpr float ZOOM_SPEED = 0.02f;
 
-		FPSCamera m_camera;
+		OrbitCamera m_camera;
 
 	private:
 

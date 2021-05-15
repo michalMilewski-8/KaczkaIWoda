@@ -30,6 +30,7 @@ struct PSInput
 {
 	float4 pos : SV_POSITION;
 	float3 worldPos : POSITION;
+	float3 tex : TEXPOSITION;
 	float3 norm : NORMAL;
 	float3 view : VIEW;
 	float clip : SV_ClipDistance0;
@@ -38,7 +39,7 @@ PSInput main(VSInput i)
 {
 	PSInput o;
 	o.worldPos = mul(worldMatrix, float4(i.pos, 1.0f)).xyz;
-
+	o.tex = normalize(o.worldPos);
 
 	o.pos = mul(viewMatrix, float4(o.worldPos, 1.0f));
 	o.pos = mul(projMatrix, o.pos);

@@ -88,39 +88,39 @@ bool DxApplication::HandleCameraInput(double dt)
 			moved = true;
 		}
 	}
-	if (keyboard) {
-		XMVECTOR upVector = XMVector3Cross(m_camera.getForwardDir(), m_camera.getRightDir());
-		if (kstate.isKeyDown(DIK_W))// W
-		{
-			m_camera.MoveTarget(m_camera.getForwardDir() * dt * MOVEMENT_SPEED);
-			moved = true;
-		}
-		if (kstate.isKeyDown(DIK_A))// A
-		{
-			m_camera.MoveTarget(m_camera.getRightDir() * -dt * MOVEMENT_SPEED);
-			moved = true;
-		}
-		if (kstate.isKeyDown(DIK_S))// S
-		{
-			m_camera.MoveTarget(m_camera.getForwardDir() * -dt * MOVEMENT_SPEED);
-			moved = true;
-		}
-		if (kstate.isKeyDown(DIK_D))// D
-		{
-			m_camera.MoveTarget(m_camera.getRightDir() * dt * MOVEMENT_SPEED);
-			moved = true;
-		}
-		if (kstate.isKeyDown(DIK_Q))// Q
-		{
-			m_camera.MoveTarget(upVector * dt * MOVEMENT_SPEED);
-			moved = true;
-		}
-		if (kstate.isKeyDown(DIK_E))// E
-		{
-			m_camera.MoveTarget(upVector * -dt * MOVEMENT_SPEED);
-			moved = true;
-		}
-	}
+	//if (keyboard) {
+	//	XMVECTOR upVector = XMVector3Cross(m_camera.getForwardDir(), m_camera.getRightDir());
+	//	if (kstate.isKeyDown(DIK_W))// W
+	//	{
+	//		m_camera.MoveTarget(m_camera.getForwardDir() * dt * MOVEMENT_SPEED);
+	//		moved = true;
+	//	}
+	//	if (kstate.isKeyDown(DIK_A))// A
+	//	{
+	//		m_camera.MoveTarget(m_camera.getRightDir() * -dt * MOVEMENT_SPEED);
+	//		moved = true;
+	//	}
+	//	if (kstate.isKeyDown(DIK_S))// S
+	//	{
+	//		m_camera.MoveTarget(m_camera.getForwardDir() * -dt * MOVEMENT_SPEED);
+	//		moved = true;
+	//	}
+	//	if (kstate.isKeyDown(DIK_D))// D
+	//	{
+	//		m_camera.MoveTarget(m_camera.getRightDir() * dt * MOVEMENT_SPEED);
+	//		moved = true;
+	//	}
+	//	if (kstate.isKeyDown(DIK_Q))// Q
+	//	{
+	//		m_camera.MoveTarget(upVector * dt * MOVEMENT_SPEED);
+	//		moved = true;
+	//	}
+	//	if (kstate.isKeyDown(DIK_E))// E
+	//	{
+	//		m_camera.MoveTarget(upVector * -dt * MOVEMENT_SPEED);
+	//		moved = true;
+	//	}
+	//}
 	return moved;
 }
 

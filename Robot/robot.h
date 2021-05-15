@@ -152,6 +152,7 @@ namespace mini::gk2
 		std::vector<BYTE> normalMap;
 
 		dx_ptr<ID3D11ShaderResourceView> m_waterTexture;
+		dx_ptr<ID3D11ShaderResourceView> m_cubeTexture;
 		dx_ptr<ID3D11Texture2D> waterTex;
 		dx_ptr<ID3D11SamplerState> m_samplerTex;
 
