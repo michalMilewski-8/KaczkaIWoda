@@ -17,11 +17,11 @@ const float Robot::ARM_SPEED = 2.0f;
 const float Robot::CIRCLE_RADIUS = 0.5f;
 
 const float Robot::SHEET_ANGLE = DirectX::XM_PIDIV4;
-const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -1.0f, 0.0f);
-const float Robot::SHEET_SIZE = 6.0f;
+const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -0.5f, 0.0f);
+const float Robot::SHEET_SIZE = 2.0f;
 const XMFLOAT4 Robot::SHEET_COLOR = XMFLOAT4(1.0f, 1.0f, 1.0f, 255.0f / 255.0f);
 
-const float Robot::WALL_SIZE = 6.0f;
+const float Robot::WALL_SIZE = 2.0f;
 const XMFLOAT3 Robot::WALLS_POS = XMFLOAT3(0.0f, -0.0f, 0.0f);
 const XMFLOAT4 LightPos = XMFLOAT4(-0.0f, 2.0f, -0.0f, 1.0f);
 
@@ -540,6 +540,9 @@ void Robot::GenerateHeightMap()
 			else
 				zjp = heightMap[i][j + 1];
 			heightMapNew[i][j] = d[i][j] * (A * (zip + zim + zjp + zjm) + B * heightMap[i][j] - heightMapOld[i][j]);
+
+			if (rand() % 100000 < 1 && rand() % 20 < 3)
+				heightMapNew[i][j] += 0.25f;
 		}
 	}
 
@@ -550,17 +553,10 @@ void Robot::GenerateHeightMap()
 		}
 	}
 
-	for (int i = 0; i < Nsize; i++) {
-		for (int j = 0; j < Nsize; j++) {
-			heightMapOld[i][j] = heightMap[i][j];
-			heightMap[i][j] = heightMapNew[i][j];
-		}
-	}
 	auto dnorm = normalMap.data();
 	for (int i = 0; i < Nsize; i++) {
 		for (int j = 0; j < Nsize; j++) {
-			if (rand() % 100000 < 1) 
-				heightMap[i][j] = 1.0f;
+			
 			float zip, zim, zjp, zjm;
 			float curr = heightMap[i][j];
 			if (i == 0)
@@ -580,10 +576,10 @@ void Robot::GenerateHeightMap()
 			else
 				zjp = heightMap[i][j + 1];
 
-			XMVECTOR vecp = { 1.0f,0.0f,zip - curr };
-			XMVECTOR vecl = { -1.0f,0.0f,curr - zim };
-			XMVECTOR vecg = { 0.0f,1.0f,zjp - curr };
-			XMVECTOR vecd = { 0.0f,-1.0f,curr - zjm };
+			XMVECTOR vecp = { h,0.0f,(zip - curr)/h };
+			XMVECTOR vecl = { -h,0.0f,(curr - zim)/h };
+			XMVECTOR vecg = { 0.0f,h,(zjp - curr)/h };
+			XMVECTOR vecd = { 0.0f,-h,(curr - zjm)/h };
 
 			auto res = XMVector3Cross(vecg, vecl);
 			auto res2 = XMVector3Cross(vecd, vecp);

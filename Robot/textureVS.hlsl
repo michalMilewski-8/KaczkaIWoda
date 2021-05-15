@@ -35,7 +35,7 @@ PSInput main(VSInput i)
 
 	
 
-	o.tex = i.pos.xy;
+	o.tex = (i.pos.xy - 1.0f)/2.0f;
 	o.worldPos = mul(worldMatrix, float4(i.pos, 1.0f));
 	o.pos = mul(viewMatrix, float4(o.worldPos, 1.0f));
 	o.pos = mul(projMatrix, o.pos);
