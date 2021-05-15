@@ -10,11 +10,13 @@ cbuffer cbLights : register(b1)
 	float4 lightPos;
 };
 
+Texture2D colorMap : register(t0);
+SamplerState colorSampler : register(s0);
 
 struct PSInput
 {
 	float4 pos : SV_POSITION;
-	float3 norm: NORMAL;
+	float2 tex: NORMAL;
 	float3 worldPos : POSITION0;
 	float3 viewVec : TEXCOORD0;
 };
@@ -27,7 +29,7 @@ float4 main(PSInput i) : SV_TARGET
 {
 
 	float3 viewVec = normalize(i.viewVec);
-	float3 normal = normalize(i.norm);
+	float3 normal = normalize(colorMap.SampleLevel(colorSampler, i.tex, 0).rgb);
 	float3 color = surfaceColor.rgb * ambientColor;
 	float3 lightPosition = lightPos.xyz;
 	float3 lightVec = normalize(lightPosition - i.worldPos);

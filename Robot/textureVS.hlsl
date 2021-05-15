@@ -14,8 +14,7 @@ cbuffer cbProj : register(b2) //Vertex Shader constant buffer slot 2 - matches s
 	matrix projMatrix;
 };
 
-Texture2D colorMap : register(t0);
-SamplerState colorSampler : register(s0);
+
 
 struct VSInput
 {
@@ -26,7 +25,7 @@ struct VSInput
 struct PSInput
 {
 	float4 pos : SV_POSITION;
-	float3 norm: NORMAL;
+	float2 tex: NORMAL;
 	float3 worldPos : POSITION0;
 	float3 viewVec : TEXCOORD0;
 };
@@ -36,7 +35,7 @@ PSInput main(VSInput i)
 
 	
 
-	o.norm = colorMap.SampleLevel(colorSampler, (i.pos.xy+1.0f)/2.0f, 0).rgb;
+	o.tex = i.pos.xy;
 	o.worldPos = mul(worldMatrix, float4(i.pos, 1.0f));
 	o.pos = mul(viewMatrix, float4(o.worldPos, 1.0f));
 	o.pos = mul(projMatrix, o.pos);

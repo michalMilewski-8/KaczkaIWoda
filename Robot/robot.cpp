@@ -112,7 +112,7 @@ Robot::Robot(HINSTANCE hInstance)
 
 	m_box = Mesh::ShadedBox(m_device);
 	m_wall = Mesh::Rectangle(m_device);
-	m_sheet = Mesh::ShadedSheet(m_device, 1.0f, Nsize);
+	m_sheet = Mesh::Rectangle(m_device);
 
 	SetShaders();
 	ID3D11Buffer* vsb[] = { m_cbWorld.get(),  m_cbView.get(), m_cbProj.get(), m_cbPlane.get() };
@@ -618,7 +618,7 @@ void Robot::Render()
 
 	GenerateHeightMap();
 	SetShaders(m_textureVS, m_texturePS);
-	SetTexturesVS({ m_waterTexture.get() }, m_samplerWrap);
+	SetTextures({ m_waterTexture.get() }, m_samplerWrap);
 	DrawSheet(true);
 	//DrawMirroredWorld(0);
 	//DrawMirroredWorld(1);
