@@ -124,7 +124,7 @@ Robot::Robot(HINSTANCE hInstance)
 			XMFLOAT2 curr = { scaledi ,scaledj };
 			float l = min(abs(SHEET_SIZE / 2.0f - curr.x), min(abs(curr.x + SHEET_SIZE / 2.0f), min(abs(SHEET_SIZE / 2.0f - curr.y), abs(curr.y + SHEET_SIZE / 2.0f))));
 			l *= 5.0f;
-			d[i][j] = 0.95f * min(1.0f, l);
+			d[i][j] = 0.7f * min(1.0f, l);
 		}
 	}
 
@@ -407,10 +407,10 @@ void Robot::GenerateHeightMap()
 			else
 				zjp = heightMap[i][j + 1];
 
-			XMVECTOR vecp = { h,(zip - curr) / h, 0.0f };
-			XMVECTOR vecl = { -h,(curr - zim) / h, 0.0f };
-			XMVECTOR vecg = { 0.0f,(zjm - curr) / h, -h };
-			XMVECTOR vecd = { 0.0f,(curr - zjp) / h, h };
+			XMVECTOR vecp = { 1,(zip - curr)/h, 0.0f };
+			XMVECTOR vecl = { -1,(zim - curr)/-h , 0.0f };
+			XMVECTOR vecg = { 0.0f,(zjm - curr)/h , -1 };
+			XMVECTOR vecd = { 0.0f,(zjp - curr)/-h, 1 };
 
 			auto res = XMVector3Cross( vecg,vecl );
 			auto res2 = XMVector3Cross(vecd, vecp);
