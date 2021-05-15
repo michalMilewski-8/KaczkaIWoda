@@ -94,22 +94,6 @@ namespace mini
 		Mesh& operator=(Mesh&& right) noexcept;
 		void Render(const dx_ptr<ID3D11DeviceContext>& context) const;
 
-		static Mesh SimpleTriMesh(const DxDevice& device, const std::vector<VertexPositionNormal> verts, const std::vector<unsigned short> idxs, const Wszystko lines)
-		{
-			if (idxs.empty())
-				return {};
-			Mesh result;
-
-			result.wszystko = lines;
-			result.m_indexBuffer = device.CreateIndexBuffer(idxs);
-			result.m_vertexBuffers.push_back(device.CreateVertexBuffer(verts));
-			result.m_strides.push_back(sizeof(VertexPositionNormal));
-			result.m_offsets.push_back(0);
-			result.m_indexCount = idxs.size();
-			result.m_primitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-			return result;
-		}
-
 		template<typename VertexType>
 		static Mesh SimpleTriMesh(const DxDevice& device, const std::vector<VertexType> verts, const std::vector<unsigned short> idxs)
 		{
@@ -131,6 +115,7 @@ namespace mini
 		static std::vector<VertexPositionColor> ColoredBoxVerts(float side = 1.0f) { return ColoredBoxVerts(side, side, side); }
 		static std::vector<VertexPositionNormal> ShadedBoxVerts(float width, float height, float depth);
 		static std::vector<VertexPositionNormal> ShadedBoxVerts(float side = 1.0f) { return ShadedBoxVerts(side, side, side); }
+		
 		static std::vector<unsigned short> BoxIdxs();
 		static Mesh ColoredBox(const DxDevice& device, float width, float height, float depth) { return SimpleTriMesh(device, ColoredBoxVerts(width, height, depth), BoxIdxs()); }
 		static Mesh ColoredBox(const DxDevice& device, float side = 1.0f) { return ColoredBox(device, side, side, side); }
@@ -141,11 +126,16 @@ namespace mini
 
 		static std::vector<VertexPositionNormal> RectangleVerts(float width, float height);
 		static std::vector<unsigned short> RectangleIdxs();
+		
 		static Mesh Rectangle(const DxDevice& device, float width = 1.0f, float height = 1.0f) { return SimpleTriMesh(device, RectangleVerts(width, height), RectangleIdxs()); }
 
 		//Shadow Box
 		static Mesh ShadowBox(const DxDevice& device, Mesh& source, DirectX::XMFLOAT4 lightPosition, DirectX::XMFLOAT4X4 world);
 
+
+		static std::vector<VertexPositionNormal> ShadedSheetVerts(float side, int number_of_divisions);
+		static std::vector<unsigned short>  ShadedSheetIdxs(int number_of_divisions);
+		static Mesh ShadedSheet(const DxDevice& device, float side, float number_of_divisions) { return SimpleTriMesh(device, ShadedSheetVerts(side, number_of_divisions), ShadedSheetIdxs(number_of_divisions)); }
 		//Cylinder Mesh Creation
 
 		static std::vector<VertexPositionNormal> CylinderVerts(float radius, float length, int radiusSplit, int lengthSplit);

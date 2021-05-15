@@ -159,6 +159,37 @@ std::vector<VertexPositionNormal> mini::Mesh::ShadedBoxVerts(float width, float 
 	};
 }
 
+std::vector<VertexPositionNormal> mini::Mesh::ShadedSheetVerts(float side, int number_of_divisions)
+{
+	auto verts = std::vector<VertexPositionNormal>();
+	float stride = side / (number_of_divisions - 1);
+
+	for (int i = 0; i < number_of_divisions; i++) {
+		for (int j = 0; j < number_of_divisions; j++) {
+			verts.push_back({ {i * stride - (side/2.0f),j * stride - (side / 2.0f),0.0f}, {1,0,0} });
+		}
+	}
+	return verts;
+}
+
+std::vector<unsigned short> mini::Mesh::ShadedSheetIdxs(int number_of_divisions)
+{
+	auto idxs = std::vector<unsigned short>();
+
+	for (int i = 0; i < number_of_divisions-1; i++) {
+		for (int j = 0; j < number_of_divisions-1; j++) {
+			idxs.push_back(i * number_of_divisions + j);
+			idxs.push_back(i * number_of_divisions + j+1);
+			idxs.push_back((i+1) * number_of_divisions + j+1);
+
+			idxs.push_back(i * number_of_divisions + j);
+			idxs.push_back((i + 1) * number_of_divisions + j + 1);
+			idxs.push_back((i + 1) * number_of_divisions + j);
+		}
+	}
+	return idxs;
+}
+
 std::vector<unsigned short> mini::Mesh::BoxIdxs()
 {
 	return {
@@ -465,9 +496,6 @@ Mesh mini::Mesh::LoadMesh(const DxDevice& device, const std::wstring& meshPath)
 		lines[i].posTo = verts_tmp[b];
 	}
 
-	Wszystko wsz;
-	wsz.edges = lines;
-	wsz.triangles = triangles;
 
-	return SimpleTriMesh(device, verts, inds, wsz);
+	return SimpleTriMesh(device, verts, inds);
 }

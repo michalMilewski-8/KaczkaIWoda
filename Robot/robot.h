@@ -55,6 +55,12 @@ namespace mini::gk2
 		static const DirectX::XMFLOAT3 SHEET_POS;
 		static const float SHEET_SIZE;
 		static constexpr unsigned int MAP_SIZE = 1024;
+		static constexpr unsigned int Nsize = 256;
+		static constexpr unsigned int pixelSize = 4;
+		static constexpr unsigned int arraySize = Nsize * Nsize * pixelSize;
+		static constexpr float h = 2.0f/(Nsize - 1);
+		static constexpr unsigned int c = 1;
+		static constexpr float dt = 1.0f/Nsize;
 		static const DirectX::XMFLOAT4 SHEET_COLOR;
 
 		static const float WALL_SIZE;
@@ -65,6 +71,7 @@ namespace mini::gk2
 		static const int CYLINDER_RADIUS_SPLIT;
 		static const int CYLINDER_LENGTH_SPLIT;
 		static const DirectX::XMFLOAT3 CYLINDER_POS;
+		
 #pragma endregion
 
 #pragma region D3D Resources
@@ -108,24 +115,7 @@ namespace mini::gk2
 		Mesh m_wall;
 		//Wall mesh
 		Mesh m_sheet;
-		//Cylinder mesh
-		Mesh m_cylinder;
-		//Arms meshes
-		Mesh m_arm0;
-		Mesh m_arm1;
-		Mesh m_arm2;
-		Mesh m_arm3;
-		Mesh m_arm4;
-		Mesh m_arm5;
 
-		//Arms angles
-		float a1 = DirectX::XM_PI;
-		float a2 = DirectX::XM_PI;
-		float a3 = 0;
-		float a4 = 0;
-		float a5 = 0;
-		bool automaticArmsMovement = true;
-		float circleAngle = 0.0f;
 		//Depth stencil state used for drawing billboards without writing to the depth buffer
 		dx_ptr<ID3D11DepthStencilState> m_dssNoDepthWrite;
 		dx_ptr<ID3D11DepthStencilState> m_dssDepthWrite;
@@ -154,6 +144,20 @@ namespace mini::gk2
 
 		dx_ptr<ID3D11Buffer> m_vbParticles;
 		ParticleSystem m_particles;
+
+		std::vector<std::vector<float>> heightMap;
+		std::vector<std::vector<float>> heightMapNew;
+		std::vector<std::vector<float>> heightMapOld;
+		std::vector<std::vector<float>> d;
+		std::vector<BYTE> normalMap;
+
+		dx_ptr<ID3D11ShaderResourceView> m_waterTexture;
+		dx_ptr<ID3D11Texture2D> waterTex;
+		dx_ptr<ID3D11SamplerState> m_samplerTex;
+
+		dx_ptr<ID3D11VertexShader> m_textureVS;
+		dx_ptr<ID3D11PixelShader> m_texturePS;
+		dx_ptr<ID3D11InputLayout> m_textureIL;
 #pragma endregion
 
 #pragma region Matrices
@@ -184,8 +188,11 @@ namespace mini::gk2
 		void DrawMirroredWorld(unsigned int i);
 		void DrawShadowVolumes();
 		void SetCameraPlane();
+		void GenerateHeightMap();
 
+		void SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11PixelShader>& ps);
 		void SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler);
+		void SetTexturesVS(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler);
 		void SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList) { SetTextures(std::move(resList), m_sampler); }
 		void DrawWorld(int i);
 		void UpdateParticles(float dt);

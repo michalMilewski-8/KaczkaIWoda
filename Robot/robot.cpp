@@ -17,13 +17,13 @@ const float Robot::ARM_SPEED = 2.0f;
 const float Robot::CIRCLE_RADIUS = 0.5f;
 
 const float Robot::SHEET_ANGLE = DirectX::XM_PIDIV4;
-const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(-1.5f, 0.0f, 0.0f);
-const float Robot::SHEET_SIZE = 1.5f;
-const XMFLOAT4 Robot::SHEET_COLOR = XMFLOAT4(0.1f, 0.1f, 0.1f, 140.0f / 255.0f);
+const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -1.0f, 0.0f);
+const float Robot::SHEET_SIZE = 6.0f;
+const XMFLOAT4 Robot::SHEET_COLOR = XMFLOAT4(1.0f, 1.0f, 1.0f, 255.0f / 255.0f);
 
-const float Robot::WALL_SIZE = 8.0f;
-const XMFLOAT3 Robot::WALLS_POS = XMFLOAT3(0.0f, 3.0f, 0.0f);
-const XMFLOAT4 LightPos = XMFLOAT4(-1.0f, 3.0f, -3.0f, 1.0f);
+const float Robot::WALL_SIZE = 6.0f;
+const XMFLOAT3 Robot::WALLS_POS = XMFLOAT3(0.0f, -0.0f, 0.0f);
+const XMFLOAT4 LightPos = XMFLOAT4(-0.0f, 2.0f, -0.0f, 1.0f);
 
 const float Robot::CYLINDER_RADIUS = 1.0f;
 const float Robot::CYLINDER_LENGTH = 4.0f;
@@ -31,6 +31,9 @@ const int Robot::CYLINDER_RADIUS_SPLIT = 20;
 const int Robot::CYLINDER_LENGTH_SPLIT = 1;
 const XMFLOAT3 Robot::CYLINDER_POS = XMFLOAT3(0.0f, -1.0f, 2.0f);
 #pragma endregion
+float closest_maximum(XMFLOAT2 a, XMFLOAT2 b) {
+	return max(abs(a.x - b.x), abs(a.y - b.y));
+}
 
 #pragma region Initalization
 Robot::Robot(HINSTANCE hInstance)
@@ -93,6 +96,15 @@ Robot::Robot(HINSTANCE hInstance)
 	m_particleGS = m_device.CreateGeometryShader(gsCode);
 	m_particleLayout = m_device.CreateInputLayout<ParticleVertex>(vsCode);
 
+
+	// texture shaders
+	vsCode = m_device.LoadByteCode(L"textureVS.cso");
+	psCode = m_device.LoadByteCode(L"texturePS.cso");
+	m_textureVS = m_device.CreateVertexShader(vsCode);
+	m_texturePS = m_device.CreatePixelShader(psCode);
+
+	m_textureIL = m_device.CreateInputLayout(VertexPositionNormal::Layout, vsCode);
+
 	//Render states
 	CreateRenderStates();
 
@@ -100,20 +112,12 @@ Robot::Robot(HINSTANCE hInstance)
 
 	m_box = Mesh::ShadedBox(m_device);
 	m_wall = Mesh::Rectangle(m_device);
-	m_cylinder = Mesh::Cylinder(m_device, CYLINDER_RADIUS, CYLINDER_LENGTH, CYLINDER_RADIUS_SPLIT, CYLINDER_LENGTH_SPLIT);
-	m_sheet = Mesh::Rectangle(m_device, SHEET_SIZE, SHEET_SIZE);
-
-	m_arm0 = Mesh::LoadMesh(m_device, L"resources/puma/mesh1.txt");
-	m_arm1 = Mesh::LoadMesh(m_device, L"resources/puma/mesh2.txt");
-	m_arm2 = Mesh::LoadMesh(m_device, L"resources/puma/mesh3.txt");
-	m_arm3 = Mesh::LoadMesh(m_device, L"resources/puma/mesh4.txt");
-	m_arm4 = Mesh::LoadMesh(m_device, L"resources/puma/mesh5.txt");
-	m_arm5 = Mesh::LoadMesh(m_device, L"resources/puma/mesh6.txt");
+	m_sheet = Mesh::ShadedSheet(m_device, 1.0f, Nsize);
 
 	SetShaders();
 	ID3D11Buffer* vsb[] = { m_cbWorld.get(),  m_cbView.get(), m_cbProj.get(), m_cbPlane.get() };
 	m_device.context()->VSSetConstantBuffers(0, 4, vsb);
-	m_device.context()->GSSetConstantBuffers(0, 1, vsb+2);
+	m_device.context()->GSSetConstantBuffers(0, 1, vsb + 2);
 	ID3D11Buffer* psb[] = { m_cbSurfaceColor.get(), m_cbLighting.get() };
 	m_device.context()->PSSetConstantBuffers(0, 2, psb);
 
@@ -162,6 +166,42 @@ Robot::Robot(HINSTANCE hInstance)
 	//srvd.Texture2D.MostDetailedMip = 0;
 
 	//m_shadowMap = m_device.CreateShaderResourceView(shadowTexture, srvd);
+
+	d = vector<vector<float>> (Nsize);
+	heightMap = vector<vector<float>>(Nsize);
+	heightMapNew = vector<vector<float>>(Nsize);
+	heightMapOld = vector<vector<float>>(Nsize);
+	normalMap = vector<BYTE>(arraySize);
+
+	for (int i = 0; i < Nsize; i++) {
+		d[i] = vector<float> (Nsize);
+		heightMap[i] = vector<float>(Nsize);
+		heightMapOld[i] = vector<float>(Nsize);
+		heightMapNew[i] = vector<float>(Nsize);
+		for (int j = 0; j < Nsize; j++) {
+			heightMap[i][j] = 0.0f;
+			heightMapNew[i][j] = 0.0f;
+			heightMapOld[i][j] = 0.0f;
+
+			float scaledi = ((i / (float)(Nsize - 1) * SHEET_SIZE) - SHEET_SIZE/2.0f);
+			float scaledj = ((j / (float)(Nsize - 1) * SHEET_SIZE) - SHEET_SIZE / 2.0f);
+			XMFLOAT2 curr = { scaledi ,scaledj };
+			float l = min(closest_maximum(curr, XMFLOAT2(-SHEET_SIZE / 2.0f, scaledj)),
+				min(closest_maximum(curr, XMFLOAT2(SHEET_SIZE / 2.0f, scaledj)),
+					min(closest_maximum(curr, XMFLOAT2(scaledi, -SHEET_SIZE / 2.0f)),
+						closest_maximum(curr, XMFLOAT2(scaledi, SHEET_SIZE / 2.0f)))));
+			l *= 5.0f;
+			d[i][j] = 0.95f * (min(1.0f, l));
+		}
+	}
+
+	auto texDesc = Texture2DDescription(Nsize, Nsize);
+	texDesc.BindFlags |= D3D11_BIND_RENDER_TARGET;
+	//texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	//texDesc.Usage = D3D11_USAGE_DYNAMIC;
+	texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+	waterTex = m_device.CreateTexture(texDesc);
+	m_waterTexture = m_device.CreateShaderResourceView(waterTex);
 }
 
 void Robot::CreateRenderStates()
@@ -170,7 +210,7 @@ void Robot::CreateRenderStates()
 	DepthStencilDescription dssDesc;
 	dssDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO; //Enable writing to depth buffer
 	m_dssNoDepthWrite = m_device.CreateDepthStencilState(dssDesc);
-	
+
 	dssDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL; //Enable writing to depth buffer
 	m_dssDepthWrite = m_device.CreateDepthStencilState(dssDesc);
 	dssDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
@@ -271,55 +311,15 @@ void Robot::Update(const Clock& c)
 		XMStoreFloat4x4(&cameraMtx, m_camera.getViewMatrix());
 		UpdateCameraCB(cameraMtx);
 	}
-	HandleArmsInput(dt);
-
-	if (automaticArmsMovement)
-	{
-		circleAngle = fmod((circleAngle + dt * ARM_SPEED), DirectX::XM_2PI);
-		XMFLOAT3 pos(CIRCLE_RADIUS * sin(circleAngle), CIRCLE_RADIUS * cos(circleAngle), 0.0f);
-		XMFLOAT3 norm(0.0f, 0.0f, -1.0f);
-
-		XMStoreFloat3(&pos, XMVector3TransformCoord(XMLoadFloat3(&pos), m_sheetMtx));
-		XMStoreFloat3(&norm, XMVector3TransformNormal(XMLoadFloat3(&norm), m_sheetMtx));
-		m_particles.UpdateEmitter(pos, m_sheetMtx);
-		InverseKinematics(&pos, &norm);
-		UpdateParticles(dt);
-	}
 }
 
 void Robot::UpdateParticles(float dt)
 {
-	auto particles = m_particles.Update(dt, m_camera.getCameraPosition());
-	UpdateBuffer(m_vbParticles, particles);
 }
 
 
 void Robot::InverseKinematics(XMFLOAT3* position, XMFLOAT3* normal)
 {
-	auto norm = XMLoadFloat3(normal);
-	auto pos = XMLoadFloat3(position);
-	float l1 = .91f, l2 = .81f, l3 = .33f, dy = .27f, dz = .26f;
-	norm = XMVector3Normalize(norm);
-	XMFLOAT3 norm_v;
-	XMStoreFloat3(&norm_v, norm);
-	XMFLOAT3 pos1;
-	XMStoreFloat3(&pos1, pos + norm * l3);
-	float e = sqrtf(pos1.z * pos1.z + pos1.x * pos1.x - dz * dz);
-	a1 = atan2(pos1.z, -pos1.x) + atan2(dz, e);
-	XMFLOAT3 pos2(e, pos1.y - dy, .0f);
-	a3 = -acosf(min(1.0f, (pos2.x * pos2.x + pos2.y * pos2.y - l1 * l1 - l2 * l2) / (2.0f * l1 * l2)));
-	float k = l1 + l2 * cosf(a3), l = l2 * sinf(a3);
-	a2 = -atan2(pos2.y, sqrtf(pos2.x * pos2.x + pos2.z * pos2.z)) - atan2(l, k);
-
-	XMVECTOR normal1;
-	XMFLOAT3 normal1_v;
-
-	normal1 = XMVector3TransformNormal(norm, XMMatrixRotationY(-a1));
-	XMStoreFloat3(&normal1_v, XMVector3TransformNormal(normal1, XMMatrixRotationZ(-(a2 + a3))));
-
-
-	a5 = acosf(normal1_v.x);
-	a4 = atan2(normal1_v.z, normal1_v.y);
 }
 
 void Robot::UpdateCameraCB(DirectX::XMFLOAT4X4 cameraMtx)
@@ -347,13 +347,14 @@ void Robot::SetShaders()
 	m_device.context()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
+void Robot::SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11PixelShader>& ps)
+{
+	m_device.context()->VSSetShader(vs.get(), nullptr, 0);
+	m_device.context()->PSSetShader(ps.get(), nullptr, 0);
+}
+
 void Robot::SetParticlesShaders()
 {
-	m_device.context()->IASetInputLayout(m_particleLayout.get());
-	m_device.context()->VSSetShader(m_particleVS.get(), 0, 0);
-	m_device.context()->PSSetShader(m_particlePS.get(), 0, 0);
-	m_device.context()->GSSetShader(m_particleGS.get(), nullptr, 0);
-	m_device.context()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 }
 
 void Robot::SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler)
@@ -361,6 +362,13 @@ void Robot::SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList
 	m_device.context()->PSSetShaderResources(0, resList.size(), resList.begin());
 	auto s_ptr = sampler.get();
 	m_device.context()->PSSetSamplers(0, 1, &s_ptr);
+}
+
+void Robot::SetTexturesVS(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler)
+{
+	m_device.context()->VSSetShaderResources(0, resList.size(), resList.begin());
+	auto s_ptr = sampler.get();
+	m_device.context()->VSSetSamplers(0, 1, &s_ptr);
 }
 
 void Robot::Set1Light(XMFLOAT4 poition)
@@ -385,7 +393,7 @@ void Robot::Set3Lights()
 		/*.ambientColor = */ XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f),
 		/*.surface = */ XMFLOAT4(0.2f, 0.8f, 0.8f, 200.0f),
 		/*.lights =*/ {
-			{ /*.position =*/ XMFLOAT4(-2.0f,3.0f,-2.0f,1.0f), /*.color =*/ XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f) }
+			{ /*.position =*/ XMFLOAT4(0.0f,2.0f,0.0f,1.0f), /*.color =*/ XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) }
 			//other 2 lights set to 0
 		}
 	};
@@ -419,109 +427,11 @@ void Robot::DrawMesh(const Mesh& m, DirectX::XMFLOAT4X4 worldMtx)
 
 bool Robot::HandleArmsInput(double dt)
 {
-	KeyboardState kstate;
-	bool moved = false;
-	if (!m_keyboard.GetState(kstate))
-		return false;
-	for (int i = 0; i < 256; ++i)
-	{
-		if (kstate.isKeyDown(i))
-		{
-			int a = 0;
-		}
-	}
-	float unit = 0.001f;
-
-	if (kstate.isKeyDown(DIK_RBRACKET))// ]
-	{
-		moved = true;
-		a1 += unit;
-	}
-	else if (kstate.isKeyDown(DIK_LBRACKET))// [
-	{
-		moved = true;
-		a1 -= unit;
-	}
-	if (kstate.isKeyDown(DIK_APOSTROPHE))// '
-	{
-		moved = true;
-		a2 += unit;
-	}
-	else if (kstate.isKeyDown(DIK_SEMICOLON))// ;
-	{
-		moved = true;
-		a2 -= unit;
-	}
-	if (kstate.isKeyDown(DIK_PERIOD))// ,
-	{
-		moved = true;
-		a3 += unit;
-	}
-	else if (kstate.isKeyDown(DIK_COMMA))// .
-	{
-		moved = true;
-		a3 -= unit;
-	}
-	if (kstate.isKeyDown(DIK_P))// P
-	{
-		moved = true;
-		a4 += unit;
-	}
-	else if (kstate.isKeyDown(DIK_O))// O
-	{
-		moved = true;
-		a4 -= unit;
-	}
-	if (kstate.isKeyDown(DIK_L))// L
-	{
-		moved = true;
-		a5 += unit;
-	}
-	else if (kstate.isKeyDown(DIK_K))// K
-	{
-		moved = true;
-		a5 -= unit;
-	}
-
-	if (kstate.isKeyDown(DIK_SPACE))//SPACE
-	{
-		automaticArmsMovement = !automaticArmsMovement;
-	}
-
-	a1 = fmod(a1, DirectX::XM_2PI);
-	a2 = fmod(a2, DirectX::XM_2PI);
-	a3 = fmod(a3, DirectX::XM_2PI);
-	a4 = fmod(a4, DirectX::XM_2PI);
-	a5 = fmod(a5, DirectX::XM_2PI);
-
-	return moved;
+	return false;
 }
 
 void Robot::DrawArms()
 {
-	XMFLOAT4X4 armMtx{};
-	XMStoreFloat4x4(&armMtx, XMMatrixIdentity());
-
-	XMVECTOR xRot = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR yRot = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	XMVECTOR zRot = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-
-	DrawMesh(m_arm0, armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixRotationAxis(yRot, a1) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(m_arm1, armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(0.0f, -0.27f, 0.0f) * XMMatrixRotationAxis(zRot, a2) * XMMatrixTranslation(0.0f, 0.27f, 0.0f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(m_arm2, armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(0.91f, -0.27f, 0.0f) * XMMatrixRotationAxis(zRot, a3) * XMMatrixTranslation(-0.91f, 0.27f, 0.0f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(m_arm3, armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(0.0f, -0.27f, 0.26f) * XMMatrixRotationAxis(xRot, a4) * XMMatrixTranslation(0.0f, 0.27f, -0.26f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(m_arm4, armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(1.72f, -0.27f, 0.0f) * XMMatrixRotationAxis(zRot, a5) * XMMatrixTranslation(-1.72f, 0.27f, 0.0f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(m_arm5, armMtx);
 }
 
 void Robot::CreateWallsMtx()
@@ -562,14 +472,10 @@ void Robot::DrawWalls()
 
 void mini::gk2::Robot::CreateCylinderMtx()
 {
-	m_cylinderMtx = XMMatrixTranslation(CYLINDER_POS.x, CYLINDER_POS.y, CYLINDER_POS.z);
 }
 
 void Robot::DrawCylinder()
 {
-	UpdateBuffer(m_cbWorld, m_cylinderMtx);
-	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(0.1f, 1.0f, 0.1f, 0.5f));
-	m_cylinder.Render(m_device.context());
 }
 
 void Robot::DrawSheet(bool colors)
@@ -591,87 +497,16 @@ void Robot::DrawSheet(bool colors)
 
 void Robot::CreateSheetMtx()
 {
-	m_sheetMtx = XMMatrixRotationX(SHEET_ANGLE) * XMMatrixRotationY(-DirectX::XM_PIDIV2) * XMMatrixTranslationFromVector(XMLoadFloat3(&SHEET_POS));
+	m_sheetMtx = XMMatrixScaling(SHEET_SIZE, SHEET_SIZE, 1.0f) * XMMatrixRotationX(DirectX::XM_PIDIV2) * XMMatrixTranslationFromVector(XMLoadFloat3(&SHEET_POS));
 	m_revSheetMtx = XMMatrixRotationY(-DirectX::XM_PI) * m_sheetMtx;
 }
 
 void Robot::DrawParticles()
 {
-	m_device.context()->OMSetBlendState(m_bsAlpha.get(), nullptr, UINT_MAX);
-	m_device.context()->OMSetDepthStencilState(m_dssNoDepthWrite.get(), 0);
-	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(0.1f, 0.1f, 0.1f, 0.9f));
-
-	if (m_particles.particlesCount() == 0)
-		return;
-	//Set input layoutv primitive topology, shaders, vertex buffer, and draw particles
-	SetTextures({ m_dropTexture.get()});
-	SetParticlesShaders();
-	unsigned int stride = sizeof(ParticleVertex);
-	unsigned int offset = 0;
-	auto vb = m_vbParticles.get();
-	m_device.context()->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
-	m_device.context()->Draw(m_particles.particlesCount(), 0);
-	SetShaders();
-
-	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-	m_device.context()->OMSetBlendState(nullptr, nullptr, UINT_MAX);
-	m_device.context()->OMSetDepthStencilState(nullptr, 0);
 }
 
 void Robot::DrawMirroredWorld(unsigned int i)
-//Draw the mirrored scene reflected in the i-th dodecahedron face
 {
-	m_device.context()->OMSetDepthStencilState(m_dssStencilWrite.get(), i + 1);
-
-	XMFLOAT4 planePos = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
-	XMFLOAT4 planeDir = XMFLOAT4(0.0f, 0.0f, -1.0f, 0.0f);
-
-	XMMATRIX m_mirrorMtx;
-	XMMATRIX m_curSheetMtx;
-
-	if (i == 0)
-	{
-		m_curSheetMtx = m_sheetMtx;
-	}
-	else
-	{
-		m_curSheetMtx = m_revSheetMtx;
-	}
-
-	UpdateBuffer(m_cbWorld, m_curSheetMtx);
-	m_mirrorMtx = XMMatrixInverse(nullptr, m_curSheetMtx) * XMMatrixScaling(1.0f, 1.0f, -1.0f) * m_curSheetMtx;
-	XMStoreFloat4(&planePos, XMVector4Transform(XMLoadFloat4(&planePos), m_curSheetMtx));
-	XMStoreFloat4(&planeDir, XMVector4Transform(XMLoadFloat4(&planeDir), m_curSheetMtx));
-	UpdatePlaneCB(planePos, planeDir);
-
-	UpdateBuffer(m_cbSurfaceColor, SHEET_COLOR);
-	m_sheet.Render(m_device.context());
-
-	m_device.context()->OMSetDepthStencilState(m_dssStencilTest.get(), i + 1);
-
-	m_device.context()->RSSetState(m_rsCCW.get());
-	XMFLOAT4X4 multiplied;
-	XMFLOAT4X4 camTmp;
-	XMStoreFloat4x4(&camTmp, m_camera.getViewMatrix());
-	XMStoreFloat4x4(&multiplied, m_mirrorMtx * m_camera.getViewMatrix());
-	UpdateCameraCB(multiplied);
-
-	m_device.context()->OMSetBlendState(nullptr, nullptr, BS_MASK);
-	Set1Light(LightPos);
-	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f));
-	DrawWorld(i);
-
-	m_device.context()->RSSetState(nullptr);
-
-	m_device.context()->OMSetDepthStencilState(m_dssStencilTestNoDepthWrite.get(), i + 1);
-	//DrawBillboards();
-	XMFLOAT4X4 cameraMtx;
-	XMStoreFloat4x4(&cameraMtx, m_camera.getViewMatrix());
-	UpdateCameraCB(cameraMtx);
-
-	SetCameraPlane();
-
-	m_device.context()->OMSetDepthStencilState(nullptr, 0);
 }
 
 void Robot::SetCameraPlane()
@@ -681,92 +516,148 @@ void Robot::SetCameraPlane()
 	XMStoreFloat4(&camDir, m_camera.getForwardDir());
 	UpdatePlaneCB(camPos, camDir);
 }
+void Robot::GenerateHeightMap()
+{
+	for (int i = 0; i < Nsize; i++) {
+		for (int j = 0; j < Nsize; j++) {
+			constexpr float A = c * c * dt * dt / (h * h);
+			constexpr float B = 2 - 4 * A;
+			float zip, zim, zjp, zjm;
+			if (i == 0)
+				zim = 0.0f;
+			else
+				zim = heightMap[i - 1][j];
+			if (j == 0)
+				zjm = 0.0f;
+			else
+				zjm = heightMap[i][j - 1];
+			if (i == Nsize - 1)
+				zip = 0.0f;
+			else
+				zip = heightMap[i + 1][j];
+			if (j == Nsize - 1)
+				zjp = 0.0f;
+			else
+				zjp = heightMap[i][j + 1];
+			heightMapNew[i][j] = d[i][j] * (A * (zip + zim + zjp + zjm) + B * heightMap[i][j] - heightMapOld[i][j]);
+		}
+	}
+
+	for (int i = 0; i < Nsize; i++) {
+		for (int j = 0; j < Nsize; j++) {
+			heightMapOld[i][j] = heightMap[i][j];
+			heightMap[i][j] = heightMapNew[i][j];
+		}
+	}
+
+	for (int i = 0; i < Nsize; i++) {
+		for (int j = 0; j < Nsize; j++) {
+			heightMapOld[i][j] = heightMap[i][j];
+			heightMap[i][j] = heightMapNew[i][j];
+		}
+	}
+	auto dnorm = normalMap.data();
+	for (int i = 0; i < Nsize; i++) {
+		for (int j = 0; j < Nsize; j++) {
+			if (rand() % 100000 < 1) 
+				heightMap[i][j] = 1.0f;
+			float zip, zim, zjp, zjm;
+			float curr = heightMap[i][j];
+			if (i == 0)
+				zim = 0.0f;
+			else
+				zim = heightMap[i - 1][j];
+			if (j == 0)
+				zjm = 0.0f;
+			else
+				zjm = heightMap[i][j - 1];
+			if (i == Nsize - 1)
+				zip = 0.0f;
+			else
+				zip = heightMap[i + 1][j];
+			if (j == Nsize - 1)
+				zjp = 0.0f;
+			else
+				zjp = heightMap[i][j + 1];
+
+			XMVECTOR vecp = { 1.0f,0.0f,zip - curr };
+			XMVECTOR vecl = { -1.0f,0.0f,curr - zim };
+			XMVECTOR vecg = { 0.0f,1.0f,zjp - curr };
+			XMVECTOR vecd = { 0.0f,-1.0f,curr - zjm };
+
+			auto res = XMVector3Cross(vecg, vecl);
+			auto res2 = XMVector3Cross(vecd, vecp);
+			auto normal = XMVector3Normalize(res + res2);
+
+			XMFLOAT3 normalny;
+			XMStoreFloat3(&normalny, normal);
+
+			*(dnorm++) = static_cast<BYTE>(normalny.x * 255.0f);
+			*(dnorm++) = static_cast<BYTE>(normalny.y * 255.0f);
+			*(dnorm++) = static_cast<BYTE>(normalny.z * 255.0f);
+			*(dnorm++) = 255;
+		}
+	}
+
+	m_device.context()->UpdateSubresource(waterTex.get(), 0, nullptr, normalMap.data(), Nsize*pixelSize, arraySize);
+	m_device.context()->GenerateMips(m_waterTexture.get());
+}
+
 void Robot::DrawWorld(int i = -1)
 {
-	//DrawBox();
-	DrawArms();
-	DrawWalls();
-	DrawCylinder();
-	if (i != 1)
-		DrawParticles();
 }
 
 void mini::gk2::Robot::DrawShadowVolumes()
 {
-	XMFLOAT4X4 armMtx{};
-	XMFLOAT4X4 cylMtx{};
-	XMStoreFloat4x4(&armMtx, XMMatrixIdentity());
-	XMStoreFloat4x4(&cylMtx, m_cylinderMtx);
-
-	XMVECTOR xRot = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR yRot = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	XMVECTOR zRot = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-
-	DrawMesh(Mesh::ShadowBox(m_device,m_arm0,LightPos, armMtx), armMtx);
-
-
-	XMStoreFloat4x4(&armMtx, XMMatrixRotationAxis(yRot, a1) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(Mesh::ShadowBox(m_device, m_arm1, LightPos, armMtx), armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(0.0f, -0.27f, 0.0f) * XMMatrixRotationAxis(zRot, a2) * XMMatrixTranslation(0.0f, 0.27f, 0.0f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(Mesh::ShadowBox(m_device, m_arm2, LightPos, armMtx), armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(0.91f, -0.27f, 0.0f) * XMMatrixRotationAxis(zRot, a3) * XMMatrixTranslation(-0.91f, 0.27f, 0.0f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(Mesh::ShadowBox(m_device, m_arm3, LightPos, armMtx), armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(0.0f, -0.27f, 0.26f) * XMMatrixRotationAxis(xRot, a4) * XMMatrixTranslation(0.0f, 0.27f, -0.26f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(Mesh::ShadowBox(m_device, m_arm4, LightPos, armMtx), armMtx);
-
-	XMStoreFloat4x4(&armMtx, XMMatrixTranslation(1.72f, -0.27f, 0.0f) * XMMatrixRotationAxis(zRot, a5) * XMMatrixTranslation(-1.72f, 0.27f, 0.0f) * XMLoadFloat4x4(&armMtx));
-	DrawMesh(Mesh::ShadowBox(m_device, m_arm5, LightPos, armMtx), armMtx);
-
-
-	//DrawMesh(Mesh::ShadowBox(m_device, m_cylinder, LightPos, cylMtx), cylMtx);
-
 }
 
 void Robot::Render()
 {
 	Base::Render();
-	SetShaders();
-	DrawMirroredWorld(0);
-	DrawMirroredWorld(1);
-  
-	//render dodecahedron with one light and alpha blendingw
-	m_device.context()->OMSetBlendState(m_bsAlphaInv.get(), nullptr, BS_MASK);
-	Set1Light(LightPos);
-	DrawSheet(true);
-	m_device.context()->OMSetBlendState(nullptr, nullptr, BS_MASK);
-
-
-	TurnOffVision();
-	//1. Rysowanie ca�ej sceny do depth buffora
-	
-	//m_device.context()->OMSetRenderTargets(0, 0,0);
-	m_device.context()->OMSetDepthStencilState(m_dssDepthWrite.get(), 0);
-	DrawSheet(true);
-	DrawWorld();
-
-	//2. Rysowanie bry� cienia do stencil buffer
-	m_device.context()->OMSetDepthStencilState(m_dssStencilWriteSh.get(), 0);
-	m_device.context()->RSSetState(m_rsCCW_backSh.get());
-	// 	   Dla front face stencil++
-	// 	   Dla back face stencil--
-	DrawShadowVolumes();
-	//DrawBox();
-	//3. Render ca�ej sceny z uwzgl�dnieniem warto�ci w stencilu
-	ResetRenderTarget();
-	
-	m_device.context()->OMSetDepthStencilState(m_dssStencilTestSh.get(), 0);
-	m_device.context()->RSSetState(m_rsCCW_frontSh.get());
-	Set1Light(LightPos);
-	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-	DrawWorld();
-
-	m_device.context()->OMSetDepthStencilState(m_dssStencilTestGreaterSh.get(), 0);
-	m_device.context()->RSSetState(m_rsCCW_frontSh.get());
 	Set3Lights();
+
+	GenerateHeightMap();
+	SetShaders(m_textureVS, m_texturePS);
+	SetTexturesVS({ m_waterTexture.get() }, m_samplerWrap);
+	DrawSheet(true);
+	//DrawMirroredWorld(0);
+	//DrawMirroredWorld(1);
+ // 
+	////render dodecahedron with one light and alpha blendingw
+	//m_device.context()->OMSetBlendState(m_bsAlphaInv.get(), nullptr, BS_MASK);
+	//Set1Light(LightPos);
+	//DrawSheet(true);
+	//m_device.context()->OMSetBlendState(nullptr, nullptr, BS_MASK);
+
+
+	//TurnOffVision();
+	////1. Rysowanie ca�ej sceny do depth buffora
+	//
+	////m_device.context()->OMSetRenderTargets(0, 0,0);
+	//m_device.context()->OMSetDepthStencilState(m_dssDepthWrite.get(), 0);
+	//DrawSheet(true);
+	//DrawWorld();
+
+	////2. Rysowanie bry� cienia do stencil buffer
+	//m_device.context()->OMSetDepthStencilState(m_dssStencilWriteSh.get(), 0);
+	//m_device.context()->RSSetState(m_rsCCW_backSh.get());
+	//// 	   Dla front face stencil++
+	//// 	   Dla back face stencil--
+	//DrawShadowVolumes();
+	////DrawBox();
+	////3. Render ca�ej sceny z uwzgl�dnieniem warto�ci w stencilu
+	//ResetRenderTarget();
+	//
+	//m_device.context()->OMSetDepthStencilState(m_dssStencilTestSh.get(), 0);
+	//m_device.context()->RSSetState(m_rsCCW_frontSh.get());
+	//Set1Light(LightPos);
+	//UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+	//DrawWorld();
+
+	//m_device.context()->OMSetDepthStencilState(m_dssStencilTestGreaterSh.get(), 0);
+	//m_device.context()->RSSetState(m_rsCCW_frontSh.get());
+	SetShaders();
 	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f));
-	DrawWorld();
+	DrawWalls();
 }
 #pragma endregion
