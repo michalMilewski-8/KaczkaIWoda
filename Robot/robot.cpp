@@ -119,14 +119,27 @@ Robot::Robot(HINSTANCE hInstance)
 			heightMap[i][j] = 0.0f;
 			heightMapOld[i][j] = 0.0f;
 
-			float scaledi = ((i / (float)(Nsize - 1) * SHEET_SIZE) - SHEET_SIZE / 2.0f);
-			float scaledj = ((j / (float)(Nsize - 1) * SHEET_SIZE) - SHEET_SIZE / 2.0f);
+			float scaledi = (((i / (float)(Nsize - 1)) * 2.0f) - 1.0f);
+			float scaledj = (((j / (float)(Nsize - 1)) * 2.0f) - 1.0f);
 			XMFLOAT2 curr = { scaledi ,scaledj };
-			float l = min(abs(SHEET_SIZE / 2.0f - curr.x), min(abs(curr.x + SHEET_SIZE / 2.0f), min(abs(SHEET_SIZE / 2.0f - curr.y), abs(curr.y + SHEET_SIZE / 2.0f))));
+			float l = min(abs(1.0f - curr.x), min(abs(curr.x + 1.0f), min(abs(1.0f - curr.y), abs(curr.y + 1.0f))));
 			l *= 5.0f;
-			d[i][j] = 0.7f * min(1.0f, l);
+			d[i][j] = 0.95f * min(1.0f, l);
 		}
 	}
+
+	for (int i = 0; i < NumberOfRandomCheckPoints; i++) {
+		deBoorPoints.push_back(XMFLOAT3(-0.9f + (0.0019f * (rand() % 1000)), SHEET_POS.y, -0.9f + (0.0019f * (rand() % 1000))));
+		T.push_back(i-1);
+	}
+	kaczordt = 3.0f;
+	deBoorPoints.push_back(deBoorPoints[0]);
+	T.push_back(NumberOfRandomCheckPoints -1);
+	deBoorPoints.push_back(deBoorPoints[1]);
+	T.push_back(NumberOfRandomCheckPoints);
+	deBoorPoints.push_back(deBoorPoints[2]);
+	T.push_back(NumberOfRandomCheckPoints +1);
+	KaczorowyDeBoor();
 
 	auto texDesc = Texture2DDescription(Nsize, Nsize);
 	texDesc.BindFlags |= D3D11_BIND_RENDER_TARGET;
@@ -134,7 +147,7 @@ Robot::Robot(HINSTANCE hInstance)
 	waterTex = m_device.CreateTexture(texDesc);
 	m_waterTexture = m_device.CreateShaderResourceView(waterTex);
 
-	m_cubeTexture = m_device.CreateShaderResourceView(L"resources/textures/cubeMap.dds");
+	m_cubeTexture = m_device.CreateShaderResourceView(L"resources/textures/output_skybox.dds");
 }
 
 void Robot::CreateRenderStates()
@@ -195,6 +208,31 @@ void Robot::SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11
 {
 	m_device.context()->VSSetShader(vs.get(), nullptr, 0);
 	m_device.context()->PSSetShader(ps.get(), nullptr, 0);
+}
+
+void mini::gk2::Robot::KaczorowyDeBoor()
+{
+	float N[5] = { 0,1,0,0,0 };
+
+	float A[5], B[5];
+	int i = (int)kaczordt + 1;
+	for (int j = 1; j <= 3; j++) {
+		A[j] = T[i+j] - kaczordt;
+		B[j] = kaczordt - T[i+1-j];
+		float saved = 0;
+		for (int k = 1; k <= j; k++) {
+			float term = N[k] / (A[k] + B[j +1 - k]);
+			N[k] = saved + A[k] * term;
+			saved = B[j +1- k] * term;
+		}
+		N[j + 1] = saved;
+	}
+	XMFLOAT3 oldPos = kaczorPosition;
+	kaczorPosition.x = N[1] * deBoorPoints[i-3].x + N[2] * deBoorPoints[i-2].x + N[3] * deBoorPoints[i-1].x + N[4] * deBoorPoints[i].x;
+	kaczorPosition.y = N[1] * deBoorPoints[i-3].y + N[2] * deBoorPoints[i-2].y + N[3] * deBoorPoints[i-1].y + N[4] * deBoorPoints[i].y;
+	kaczorPosition.z = N[1] * deBoorPoints[i-3].z + N[2] * deBoorPoints[i-2].z + N[3] * deBoorPoints[i-1].z + N[4] * deBoorPoints[i].z;
+	kaczordt += kaczorSpeed;
+	XMStoreFloat3(&kaczorDirection, XMVector3Normalize(XMLoadFloat3(&kaczorPosition)-XMLoadFloat3(&oldPos)));
 }
 
 void Robot::SetParticlesShaders()
@@ -354,77 +392,69 @@ void Robot::SetCameraPlane()
 }
 void Robot::GenerateHeightMap()
 {
+	auto dnorm = normalMap.data();
+
+	/*for (int i = 0; i < Nsize; i++) {
+		for (int j = 0; j < Nsize; j++) {
+			if (rand() % 100000 < 1 && rand() % 20 < 3)
+				heightMapOld[i][j] = 0.25f;
+		}
+	}*/
+	int u = (kaczorPosition.x + 1.0f) * 0.5f * (Nsize - 1);
+	int v = (kaczorPosition.z + 1.0f) * 0.5f * (Nsize - 1);
+	heightMapOld[u][v] = 0.25f;
+	constexpr float A = c * c * dt * dt / (h * h);
+	constexpr float B = 2 - 4 * A;
 	for (int i = 0; i < Nsize; i++) {
 		for (int j = 0; j < Nsize; j++) {
-			constexpr float A = c * c * dt * dt / (h * h);
-			constexpr float B = 2 - 4 * A;
-			float zip, zim, zjp, zjm;
-			if (i == 0)
-				zim = 0.0f;
-			else
-				zim = heightMap[i - 1][j];
-			if (j == 0)
-				zjm = 0.0f;
-			else
-				zjm = heightMap[i][j - 1];
-			if (i == Nsize - 1)
-				zip = 0.0f;
-			else
-				zip = heightMap[i + 1][j];
-			if (j == Nsize - 1)
-				zjp = 0.0f;
-			else
-				zjp = heightMap[i][j + 1];
-			heightMapOld[i][j] = d[i][j] * (A * (zip + zim + zjp + zjm) + B * heightMap[i][j] - heightMapOld[i][j]);
+			float zip = 0.0f;
+			if (i >0)
+				zip += heightMapOld[i - 1][j];
+			if (j > 0)
+				zip += heightMapOld[i][j - 1];
+			if (i < Nsize - 1)
+				zip += heightMapOld[i + 1][j];
+			if (j < Nsize - 1)
+				zip += heightMapOld[i][j + 1];
 
-			if (rand() % 100000 < 1 && rand() % 20 < 3)
-				heightMapOld[i][j] += 0.25f;
+			heightMap[i][j] = d[i][j] * (A * zip + B * heightMapOld[i][j] - heightMap[i][j]);
 		}
 	}
 
 	std::swap(heightMapOld, heightMap);
-
-	auto dnorm = normalMap.data();
 	for (int i = 0; i < Nsize; i++) {
 		for (int j = 0; j < Nsize; j++) {
-
-			float zip, zim, zjp, zjm;
-			float curr = heightMap[i][j];
-			if (i == 0)
-				zim = 0.0f;
-			else
+			float zip = 0, zim = 0, zjp = 0, zjm = 0;
+			if (i > 0)
 				zim = heightMap[i - 1][j];
-			if (j == 0)
-				zjm = 0.0f;
-			else
+			if (j > 0)
 				zjm = heightMap[i][j - 1];
-			if (i == Nsize - 1)
-				zip = 0.0f;
-			else
+			if (i < Nsize - 1)
 				zip = heightMap[i + 1][j];
-			if (j == Nsize - 1)
-				zjp = 0.0f;
-			else
+			if (j < Nsize - 1)
 				zjp = heightMap[i][j + 1];
 
-			XMVECTOR vecp = { 1,(zip - curr)/h, 0.0f };
-			XMVECTOR vecl = { -1,(zim - curr)/-h , 0.0f };
-			XMVECTOR vecg = { 0.0f,(zjm - curr)/h , -1 };
-			XMVECTOR vecd = { 0.0f,(zjp - curr)/-h, 1 };
+			float curr = heightMap[i][j];
 
-			auto res = XMVector3Cross( vecg,vecl );
+			XMVECTOR vecp = { 10,(zip - curr) / h, 0.0f };
+			XMVECTOR vecl = { -10,(zim - curr) / h , 0.0f };
+			XMVECTOR vecg = { 0.0f,(zjm - curr) / h , -10 };
+			XMVECTOR vecd = { 0.0f,(zjp - curr) / h, 10 };
+
+			auto res = XMVector3Cross(vecg, vecl);
 			auto res2 = XMVector3Cross(vecd, vecp);
 			auto normal = XMVector3Normalize(res + res2);
 
 			XMFLOAT3 normalny;
 			XMStoreFloat3(&normalny, normal);
 
-			*(dnorm++) = static_cast<BYTE>((normalny.x + 1.0f)/2.0f * 255.0f);
+			*(dnorm++) = static_cast<BYTE>((normalny.x + 1.0f) / 2.0f * 255.0f);
 			*(dnorm++) = static_cast<BYTE>((normalny.y + 1.0f) / 2.0f * 255.0f);
 			*(dnorm++) = static_cast<BYTE>((normalny.z + 1.0f) / 2.0f * 255.0f);
 			*(dnorm++) = 255;
 		}
 	}
+
 
 	m_device.context()->UpdateSubresource(waterTex.get(), 0, nullptr, normalMap.data(), Nsize * pixelSize, arraySize);
 	m_device.context()->GenerateMips(m_waterTexture.get());
@@ -441,6 +471,7 @@ void mini::gk2::Robot::DrawShadowVolumes()
 void Robot::Render()
 {
 	Base::Render();
+	KaczorowyDeBoor();
 	GenerateHeightMap();
 	SetShaders(m_textureVS, m_texturePS);
 	SetTextures({ m_waterTexture.get(), m_cubeTexture.get() }, m_samplerWrap);

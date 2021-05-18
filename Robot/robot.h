@@ -4,6 +4,7 @@
 #include "dxApplication.h"
 #include "mesh.h"
 #include "particleSystem.h"
+#include <queue>
 
 namespace mini::gk2
 {
@@ -57,8 +58,10 @@ namespace mini::gk2
 		static constexpr unsigned int MAP_SIZE = 1024;
 		static constexpr unsigned int Nsize = 256;
 		static constexpr unsigned int pixelSize = 4;
+		static constexpr unsigned int NumberOfRandomCheckPoints = 1000;
 		static constexpr unsigned int arraySize = Nsize * Nsize * pixelSize;
 		static constexpr float h = 2.0f/(Nsize - 1);
+		static constexpr float kaczorSpeed = 0.01f;
 		static constexpr unsigned int c = 1;
 		static constexpr float dt = 1.0f/Nsize;
 		static const DirectX::XMFLOAT4 SHEET_COLOR;
@@ -149,6 +152,12 @@ namespace mini::gk2
 		std::vector<std::vector<float>> heightMapOld;
 		std::vector<std::vector<float>> d;
 		std::vector<BYTE> normalMap;
+		std::vector<DirectX::XMFLOAT3> deBoorPoints;
+		std::vector<int> T;
+		DirectX::XMFLOAT3 depoints[4];
+		float kaczordt;
+		DirectX::XMFLOAT3 kaczorPosition;
+		DirectX::XMFLOAT3 kaczorDirection;
 
 		dx_ptr<ID3D11ShaderResourceView> m_waterTexture;
 		dx_ptr<ID3D11ShaderResourceView> m_cubeTexture;
@@ -189,6 +198,8 @@ namespace mini::gk2
 		void DrawShadowVolumes();
 		void SetCameraPlane();
 		void GenerateHeightMap();
+
+		void KaczorowyDeBoor();
 
 		void SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11PixelShader>& ps);
 		void SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler);
