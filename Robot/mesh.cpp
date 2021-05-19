@@ -403,44 +403,6 @@ Mesh mini::Mesh::ShadowBox(const DxDevice& device, Mesh& source, DirectX::XMFLOA
 		}
 	}
 
-
-
-	//for (int i = 0; i < source.vertex_.size() / 2; i++) {
-	//	source.indices_;
-	//	indices[6 * i + 0] = 4 * i + 0;
-	//	indices[6 * i + 1] = 4 * i + 2;
-	//	indices[6 * i + 2] = 4 * i + 1;
-
-	//	indices[6 * i + 3] = 4 * i + 2;
-	//	indices[6 * i + 4] = 4 * i + 3;
-	//	indices[6 * i + 5] = 4 * i + 1;
-
-	//	/*	indices[18 * i] = 2 * source.indices_[3 * i];
-	//		indices[18 * i + 2] = 2 * source.indices_[3 * i +1];
-	//		indices[18 * i + 1] = 2 * source.indices_[3 * i] +1;
-
-	//		indices[18 * i + 3] = 2 * source.indices_[3 * i + 1];
-	//		indices[18 * i + 5] = 2 * source.indices_[3 * i + 1] + 1;
-	//		indices[18 * i + 4] = 2 * source.indices_[3 * i] + 1;
-
-	//		indices[18 * i + 6] = 2 * source.indices_[3 * i +1];
-	//		indices[18 * i + 8] = 2 * source.indices_[3 * i + 2];
-	//		indices[18 * i + 7] = 2 * source.indices_[3 * i + 1] + 1;
-
-	//		indices[18 * i + 9] = 2 * source.indices_[3 * i + 2];
-	//		indices[18 * i + 11] = 2 * source.indices_[3 * i + 2] + 1;
-	//		indices[18 * i + 10] = 2 * source.indices_[3 * i + 1] + 1;
-
-	//		indices[18 * i + 12] = 2 * source.indices_[3 * i + 2];
-	//		indices[18 * i + 14] = 2 * source.indices_[3 * i + 0];
-	//		indices[18 * i + 13] = 2 * source.indices_[3 * i + 2] + 1;
-
-	//		indices[18 * i + 15] = 2 * source.indices_[3 * i + 2];
-	//		indices[18 * i + 17] = 2 * source.indices_[3 * i + 2] + 1;
-	//		indices[18 * i + 16] = 2 * source.indices_[3 * i + 0] + 1;*/
-	//}
-
-
 	return SimpleTriMesh(device, verts, indices);
 }
 
@@ -463,39 +425,29 @@ Mesh mini::Mesh::LoadMesh(const DxDevice& device, const std::wstring& meshPath)
 	input >> vn;
 
 	vector<DirectX::XMFLOAT3> verts_tmp(vn);
+	vector<DirectX::XMFLOAT3> norms_tmp(vn);
+	vector<DirectX::XMFLOAT2> tex_tmp(vn);
 	for (auto i = 0; i < vn; ++i)
+	{
 		input >> verts_tmp[i].x >> verts_tmp[i].y >> verts_tmp[i].z;
+		input >> norms_tmp[i].x >> norms_tmp[i].y >> norms_tmp[i].z;
+		input >> tex_tmp[i].x >> tex_tmp[i].y;
+	}
 
-	input >> vn;
-	vector<VertexPositionNormal> verts(vn);
+	vector<VertexPositionNormalTex> verts(vn);
 	int ind;
 	for (auto i = 0; i < vn; ++i)
 	{
-		input >> ind >> verts[i].normal.x >> verts[i].normal.y >> verts[i].normal.z;
-		verts[i].position.x = verts_tmp[ind].x;
-		verts[i].position.y = verts_tmp[ind].y;
-		verts[i].position.z = verts_tmp[ind].z;
+		verts[i].position = verts_tmp[i];
+		verts[i].normal = norms_tmp[i];
+		verts[i].tex = tex_tmp[i];
 	}
 
 	input >> in;
 	vector<unsigned short> inds(3 * in);
-	vector<Triangle> triangles(in);
 	for (auto i = 0; i < in; ++i) {
 		input >> inds[3 * i] >> inds[3 * i + 1] >> inds[3 * i + 2];
-		triangles[i].p1 = verts[inds[3 * i]].position;
-		triangles[i].p2 = verts[inds[3 * i + 1]].position;
-		triangles[i].p3 = verts[inds[3 * i + 2]].position;
 	}
-
-	input >> kn;
-	vector<Edge> lines(kn);
-	int a, b, c, d;
-	for (auto i = 0; i < kn; ++i) {
-		input >> a >> b >> lines[i].tr1 >> lines[i].tr2;
-		lines[i].posFrom = verts_tmp[a];
-		lines[i].posTo = verts_tmp[b];
-	}
-
 
 	return SimpleTriMesh(device, verts, inds);
 }

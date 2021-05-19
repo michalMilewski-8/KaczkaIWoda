@@ -1,5 +1,6 @@
 #include "robot.h"
 #include "particleSystem.h"
+#include <cmath>
 
 
 using namespace mini;
@@ -30,21 +31,20 @@ const XMFLOAT4 LightPos = XMFLOAT4(0.0f, 0.5f, 1.0f, 1.0f);
 
 #pragma region Initalization
 Robot::Robot(HINSTANCE hInstance)
-	: Base(hInstance, 1280, 720, L"Robot"),
+	: Base(hInstance, 1280, 720, L"Kaczor"),
 	m_cbWorld(m_device.CreateConstantBuffer<XMFLOAT4X4>()),
 	m_cbView(m_device.CreateConstantBuffer<XMFLOAT4X4, 2>()),
 	m_cbLighting(m_device.CreateConstantBuffer<Lighting>()),
-	m_cbSurfaceColor(m_device.CreateConstantBuffer<XMFLOAT4>()),
-	m_cbPlane(m_device.CreateConstantBuffer<XMFLOAT4, 2>()),
-	m_particles{ {m_sheetMtx}, {XMFLOAT3(0.0f,0.0f,0.0f)} },
-	m_dropTexture(m_device.CreateShaderResourceView(L"resources/textures/drop.png"))
+	m_cbSurfaceColor(m_device.CreateConstantBuffer<XMFLOAT4>())
 {
 	//Projection matrix
 	auto s = m_window.getClientSize();
 	auto ar = static_cast<float>(s.cx) / s.cy;
+
 	XMStoreFloat4x4(&m_projMtx, XMMatrixPerspectiveFovLH(XM_PIDIV4, ar, 0.01f, 100.0f));
 	m_cbProj = m_device.CreateConstantBuffer<XMFLOAT4X4>();
 	UpdateBuffer(m_cbProj, m_projMtx);
+
 	XMFLOAT4X4 cameraMtx;
 	XMStoreFloat4x4(&cameraMtx, m_camera.getViewMatrix());
 	UpdateCameraCB(cameraMtx);
@@ -56,29 +56,13 @@ Robot::Robot(HINSTANCE hInstance)
 	sd.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
 	sd.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
 	sd.MaxAnisotropy = 16;
-
 	m_samplerWrap = m_device.CreateSamplerState(sd);
-
-	SamplerDescription sd2;
-	/*sd.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
-	sd.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
-	sd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
-	sd.BorderColor[0] = 0.0f;
-	sd.BorderColor[1] = 0.0f;
-	sd.BorderColor[2] = 0.0f;
-	sd.BorderColor[3] = 0.0f;
-	sd.MipLODBias = 0.5f;*/
-	m_samplerWrap_back = m_device.CreateSamplerState(sd2);
-
-	//Camera Plane
-	SetCameraPlane();
 
 	//Regular shaders
 	auto vsCode = m_device.LoadByteCode(L"vs.cso");
 	auto psCode = m_device.LoadByteCode(L"ps.cso");
 	m_vs = m_device.CreateVertexShader(vsCode);
 	m_ps = m_device.CreatePixelShader(psCode);
-
 	m_il = m_device.CreateInputLayout(VertexPositionNormal::Layout, vsCode);
 
 
@@ -87,19 +71,25 @@ Robot::Robot(HINSTANCE hInstance)
 	psCode = m_device.LoadByteCode(L"texturePS.cso");
 	m_textureVS = m_device.CreateVertexShader(vsCode);
 	m_texturePS = m_device.CreatePixelShader(psCode);
-
 	m_textureIL = m_device.CreateInputLayout(VertexPositionNormal::Layout, vsCode);
+
+	// texture shaders
+	vsCode = m_device.LoadByteCode(L"kaczorVS.cso");
+	psCode = m_device.LoadByteCode(L"kaczorPS.cso");
+	m_kaczorVS = m_device.CreateVertexShader(vsCode);
+	m_kaczorPS = m_device.CreatePixelShader(psCode);
+	m_kaczorIL = m_device.CreateInputLayout(VertexPositionNormalTex::Layout, vsCode);
 
 	//Render states
 	CreateRenderStates();
 
 	m_wall = Mesh::Rectangle(m_device);
 	m_sheet = Mesh::Rectangle(m_device);
+	m_duck = Mesh::LoadMesh(m_device, L"resources/duck/duck.txt");
 
 	SetShaders();
-	ID3D11Buffer* vsb[] = { m_cbWorld.get(),  m_cbView.get(), m_cbProj.get(), m_cbPlane.get() };
-	m_device.context()->VSSetConstantBuffers(0, 4, vsb);
-	m_device.context()->GSSetConstantBuffers(0, 1, vsb + 2);
+	ID3D11Buffer* vsb[] = { m_cbWorld.get(),  m_cbView.get(), m_cbProj.get() };
+	m_device.context()->VSSetConstantBuffers(0, 3, vsb);
 	ID3D11Buffer* psb[] = { m_cbSurfaceColor.get(), m_cbLighting.get() };
 	m_device.context()->PSSetConstantBuffers(0, 2, psb);
 
@@ -146,8 +136,8 @@ Robot::Robot(HINSTANCE hInstance)
 	texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
 	waterTex = m_device.CreateTexture(texDesc);
 	m_waterTexture = m_device.CreateShaderResourceView(waterTex);
-
 	m_cubeTexture = m_device.CreateShaderResourceView(L"resources/textures/output_skybox.dds");
+	m_kaczorTexture = m_device.CreateShaderResourceView(L"resources/duck/ducktex.jpg");
 }
 
 void Robot::CreateRenderStates()
@@ -170,15 +160,6 @@ void Robot::Update(const Clock& c)
 	}
 }
 
-void Robot::UpdateParticles(float dt)
-{
-}
-
-
-void Robot::InverseKinematics(XMFLOAT3* position, XMFLOAT3* normal)
-{
-}
-
 void Robot::UpdateCameraCB(DirectX::XMFLOAT4X4 cameraMtx)
 {
 	XMMATRIX mtx = XMLoadFloat4x4(&cameraMtx);
@@ -188,11 +169,7 @@ void Robot::UpdateCameraCB(DirectX::XMFLOAT4X4 cameraMtx)
 	XMStoreFloat4x4(view + 1, invvmtx);
 	UpdateBuffer(m_cbView, view);
 }
-void Robot::UpdatePlaneCB(DirectX::XMFLOAT4 pos, DirectX::XMFLOAT4 dir)
-{
-	XMFLOAT4 plane[2] = { pos,dir };
-	UpdateBuffer(m_cbPlane, plane);
-}
+
 #pragma endregion
 #pragma region Frame Rendering Setup
 void Robot::SetShaders()
@@ -206,6 +183,13 @@ void Robot::SetShaders()
 
 void Robot::SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11PixelShader>& ps)
 {
+	m_device.context()->VSSetShader(vs.get(), nullptr, 0);
+	m_device.context()->PSSetShader(ps.get(), nullptr, 0);
+}
+
+void Robot::SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11PixelShader>& ps, const dx_ptr<ID3D11InputLayout>& il)
+{
+	m_device.context()->IASetInputLayout(il.get());
 	m_device.context()->VSSetShader(vs.get(), nullptr, 0);
 	m_device.context()->PSSetShader(ps.get(), nullptr, 0);
 }
@@ -235,8 +219,9 @@ void mini::gk2::Robot::KaczorowyDeBoor()
 	XMStoreFloat3(&kaczorDirection, XMVector3Normalize(XMLoadFloat3(&kaczorPosition)-XMLoadFloat3(&oldPos)));
 }
 
-void Robot::SetParticlesShaders()
+void mini::gk2::Robot::CreateKaczorMtx()
 {
+	m_kaczorMtx = XMMatrixScaling(0.001, 0.001, 0.001)* XMMatrixRotationAxis(XMVECTOR{ 0, -1, 0 }, std::atan2f(kaczorDirection.x, kaczorDirection.z) + g_XMPi.f[0]) * XMMatrixTranslation(kaczorPosition.z, kaczorPosition.y, kaczorPosition.x);
 }
 
 void Robot::SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler)
@@ -244,13 +229,6 @@ void Robot::SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList
 	m_device.context()->PSSetShaderResources(0, resList.size(), resList.begin());
 	auto s_ptr = sampler.get();
 	m_device.context()->PSSetSamplers(0, 1, &s_ptr);
-}
-
-void Robot::SetTexturesVS(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler)
-{
-	m_device.context()->VSSetShaderResources(0, resList.size(), resList.begin());
-	auto s_ptr = sampler.get();
-	m_device.context()->VSSetSamplers(0, 1, &s_ptr);
 }
 
 void Robot::Set1Light(XMFLOAT4 poition)
@@ -288,10 +266,6 @@ void Robot::Set3Lights()
 #pragma endregion
 
 #pragma region Drawing
-void Robot::DrawBox()
-{
-}
-
 void Robot::SetWorldMtx(DirectX::XMFLOAT4X4 mtx)
 {
 	UpdateBuffer(m_cbWorld, mtx);
@@ -301,15 +275,6 @@ void Robot::DrawMesh(const Mesh& m, DirectX::XMFLOAT4X4 worldMtx)
 {
 	SetWorldMtx(worldMtx);
 	m.Render(m_device.context());
-}
-
-bool Robot::HandleArmsInput(double dt)
-{
-	return false;
-}
-
-void Robot::DrawArms()
-{
 }
 
 void Robot::CreateWallsMtx()
@@ -348,26 +313,14 @@ void Robot::DrawWalls()
 	}
 }
 
-void mini::gk2::Robot::CreateCylinderMtx()
-{
-}
-
-void Robot::DrawCylinder()
-{
-}
-
 void Robot::DrawSheet(bool colors)
 {
-	if (colors)
-	{
-		UpdateBuffer(m_cbSurfaceColor, SHEET_COLOR);
-	}
-	else
-	{
-		UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-	}
+
+	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
 	UpdateBuffer(m_cbWorld, m_sheetMtx);
 	m_sheet.Render(m_device.context());
+
+	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(1.0f, -1.0f, 1.0f, 1.0f));
 
 	UpdateBuffer(m_cbWorld, m_revSheetMtx);
 	m_sheet.Render(m_device.context());
@@ -379,27 +332,16 @@ void Robot::CreateSheetMtx()
 	m_revSheetMtx = XMMatrixRotationY(-DirectX::XM_PI) * m_sheetMtx;
 }
 
-void Robot::DrawParticles()
-{
-}
-
-void Robot::DrawMirroredWorld(unsigned int i)
-{
-}
-
-void Robot::SetCameraPlane()
-{
-}
 void Robot::GenerateHeightMap()
 {
 	auto dnorm = normalMap.data();
 
-	/*for (int i = 0; i < Nsize; i++) {
+	for (int i = 0; i < Nsize; i++) {
 		for (int j = 0; j < Nsize; j++) {
 			if (rand() % 100000 < 1 && rand() % 20 < 3)
 				heightMapOld[i][j] = 0.25f;
 		}
-	}*/
+	}
 	int u = (kaczorPosition.x + 1.0f) * 0.5f * (Nsize - 1);
 	int v = (kaczorPosition.z + 1.0f) * 0.5f * (Nsize - 1);
 	heightMapOld[u][v] = 0.25f;
@@ -460,12 +402,11 @@ void Robot::GenerateHeightMap()
 	m_device.context()->GenerateMips(m_waterTexture.get());
 }
 
-void Robot::DrawWorld(int i = -1)
+void Robot::DrawKaczor()
 {
-}
+	UpdateBuffer(m_cbWorld, m_kaczorMtx);
 
-void mini::gk2::Robot::DrawShadowVolumes()
-{
+	m_duck.Render(m_device.context());
 }
 
 void Robot::Render()
@@ -478,8 +419,13 @@ void Robot::Render()
 	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f));
 	DrawSheet(true);
 
+	SetShaders(m_kaczorVS, m_kaczorPS, m_kaczorIL);
+	SetTextures({ m_kaczorTexture.get() }, m_samplerWrap);
+	CreateKaczorMtx();
+	DrawKaczor();
+
 	SetShaders();
-	SetTextures({ m_cubeTexture.get() }, m_samplerWrap_back);
+	SetTextures({ m_cubeTexture.get() }, m_samplerWrap);
 	Set1Light(LightPos);
 	UpdateBuffer(m_cbSurfaceColor, XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f));
 	DrawWalls();

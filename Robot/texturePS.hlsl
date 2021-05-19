@@ -52,7 +52,9 @@ static const float4 lightPos = float4(0.0f, 0.5f, 1.0f, 1.0f);
 float4 main(PSInput i) : SV_TARGET
 {
 	float3 viewVec = normalize(i.viewVec);
-	float3 normal = normalize(colorMap.SampleLevel(colorSampler, i.tex, 0).rgb *2.0f -1.0f);
+	float2 tex = i.tex;
+	tex.x = tex.x * surfaceColor.y;
+	float3 normal = normalize(colorMap.SampleLevel(colorSampler, tex, 0).rgb *2.0f -1.0f);
 	//return float4(normal, 1.0f);
 	float wsp = 0.14f;
 	if (dot(normal, viewVec) < 0) {

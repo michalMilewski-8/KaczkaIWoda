@@ -68,12 +68,6 @@ namespace mini::gk2
 
 		static const float WALL_SIZE;
 		static const DirectX::XMFLOAT3 WALLS_POS;
-
-		static const float CYLINDER_RADIUS;
-		static const float CYLINDER_LENGTH;
-		static const int CYLINDER_RADIUS_SPLIT;
-		static const int CYLINDER_LENGTH_SPLIT;
-		static const DirectX::XMFLOAT3 CYLINDER_POS;
 		
 #pragma endregion
 
@@ -95,22 +89,15 @@ namespace mini::gk2
 		//Shader's constant buffer containing surface color
 		dx_ptr<ID3D11Buffer> m_cbSurfaceColor;
 		//ConstantBuffer<DirectX::XMFLOAT4> m_cbSurfaceColor;
-		dx_ptr<ID3D11Buffer> m_cbPlane;
-		//ConstantBuffer<DirectX::XMFLOAT4> m_cbSurfaceColor;
-		// 
-
 
 		dx_ptr<ID3D11SamplerState> m_sampler;
 
 
-		dx_ptr<ID3D11VertexShader> m_vs, m_particleVS;
-		dx_ptr<ID3D11GeometryShader> m_particleGS;
-		dx_ptr<ID3D11PixelShader> m_ps, m_particlePS;
-		dx_ptr<ID3D11InputLayout> m_il, m_particleLayout;
+		dx_ptr<ID3D11VertexShader> m_vs;
+		dx_ptr<ID3D11PixelShader> m_ps;
+		dx_ptr<ID3D11InputLayout> m_il;
 
-		dx_ptr<ID3D11ShaderResourceView> m_dropTexture;
 		dx_ptr<ID3D11SamplerState> m_samplerWrap;
-		dx_ptr<ID3D11SamplerState> m_samplerWrap_back;
 
 		//Box mesh
 		Mesh m_box;
@@ -118,6 +105,8 @@ namespace mini::gk2
 		Mesh m_wall;
 		//Wall mesh
 		Mesh m_sheet;
+		//Kaczor mesh
+		Mesh m_duck;
 
 		//Depth stencil state used for drawing billboards without writing to the depth buffer
 		dx_ptr<ID3D11DepthStencilState> m_dssNoDepthWrite;
@@ -141,13 +130,6 @@ namespace mini::gk2
 		//Blend state used to draw billboards.
 		dx_ptr<ID3D11BlendState> m_bsAdd;
 
-		dx_ptr<ID3D11DepthStencilView> m_shadowDepthBuffer;
-
-		dx_ptr<ID3D11ShaderResourceView> m_shadowMap;
-
-		dx_ptr<ID3D11Buffer> m_vbParticles;
-		ParticleSystem m_particles;
-
 		std::vector<std::vector<float>> heightMap;
 		std::vector<std::vector<float>> heightMapOld;
 		std::vector<std::vector<float>> d;
@@ -161,12 +143,19 @@ namespace mini::gk2
 
 		dx_ptr<ID3D11ShaderResourceView> m_waterTexture;
 		dx_ptr<ID3D11ShaderResourceView> m_cubeTexture;
+		dx_ptr<ID3D11ShaderResourceView> m_kaczorTexture;
 		dx_ptr<ID3D11Texture2D> waterTex;
 		dx_ptr<ID3D11SamplerState> m_samplerTex;
 
+		// wodne te
 		dx_ptr<ID3D11VertexShader> m_textureVS;
 		dx_ptr<ID3D11PixelShader> m_texturePS;
 		dx_ptr<ID3D11InputLayout> m_textureIL;
+
+		//kaczorowe shadery
+		dx_ptr<ID3D11VertexShader> m_kaczorVS;
+		dx_ptr<ID3D11PixelShader> m_kaczorPS;
+		dx_ptr<ID3D11InputLayout> m_kaczorIL;
 #pragma endregion
 
 #pragma region Matrices
@@ -174,39 +163,28 @@ namespace mini::gk2
 		DirectX::XMMATRIX m_wallsMtx[6];
 		DirectX::XMMATRIX m_sheetMtx;
 		DirectX::XMMATRIX m_revSheetMtx;
-		DirectX::XMMATRIX m_cylinderMtx;
+		DirectX::XMMATRIX m_kaczorMtx;
 #pragma endregion
 		void SetWorldMtx(DirectX::XMFLOAT4X4 mtx);
 		void DrawMesh(const Mesh& m, DirectX::XMFLOAT4X4 worldMtx);
 		void UpdateCameraCB(DirectX::XMFLOAT4X4 cameraMtx);
-		void UpdatePlaneCB(DirectX::XMFLOAT4 pos, DirectX::XMFLOAT4 dir);
 		void Set1Light(DirectX::XMFLOAT4 LightPos);
 		void SetShaders();
-		void SetParticlesShaders();
 		void Set3Lights();
-		void DrawBox();
 		void CreateWallsMtx();
 		void DrawWalls();
-		void CreateCylinderMtx();
-		void DrawCylinder();
 		void CreateSheetMtx();
 		void DrawSheet(bool colors);
-		void DrawArms();
-		bool HandleArmsInput(double dt);
-		void InverseKinematics(DirectX::XMFLOAT3* position, DirectX::XMFLOAT3* normal);
-		void DrawMirroredWorld(unsigned int i);
-		void DrawShadowVolumes();
-		void SetCameraPlane();
+		void CreateKaczorMtx();
+		void DrawKaczor();
+
 		void GenerateHeightMap();
 
 		void KaczorowyDeBoor();
 
 		void SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11PixelShader>& ps);
+		void SetShaders(const dx_ptr<ID3D11VertexShader>& vs, const dx_ptr<ID3D11PixelShader>& ps, const dx_ptr<ID3D11InputLayout>& il);
 		void SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler);
-		void SetTexturesVS(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler);
-		void SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList) { SetTextures(std::move(resList), m_sampler); }
-		void DrawWorld(int i);
-		void UpdateParticles(float dt);
-		void DrawParticles();
+		
 	};
 }

@@ -77,8 +77,6 @@ namespace mini
 		}
 
 
-
-
 		//***************** NEW *****************
 		//Additional template parameter to allow creation of buffers for arrays
 

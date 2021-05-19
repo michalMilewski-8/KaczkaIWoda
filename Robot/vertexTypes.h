@@ -26,4 +26,13 @@ namespace mini
 
 		static const D3D11_INPUT_ELEMENT_DESC Layout[2];
 	};
+
+	struct VertexPositionNormalTex
+	{
+		DirectX::XMFLOAT3 position;
+		DirectX::XMFLOAT3 normal;
+		DirectX::XMFLOAT2 tex;
+
+		static const D3D11_INPUT_ELEMENT_DESC Layout[3];
+	};
 }
