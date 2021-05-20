@@ -19,7 +19,7 @@ const float Robot::CIRCLE_RADIUS = 0.5f;
 
 const float Robot::SHEET_ANGLE = DirectX::XM_PIDIV4;
 const float Robot::SHEET_SIZE = 2.0f;
-const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -0.5f, 0.0f);
+const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -0.05f, 0.0f);
 const XMFLOAT4 Robot::SHEET_COLOR = XMFLOAT4(1.0f, 1.0f, 1.0f, 255.0f / 255.0f);
 const float KACZOR_SIZE = 0.0015f;
 
@@ -137,7 +137,7 @@ Robot::Robot(HINSTANCE hInstance)
 	texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
 	waterTex = m_device.CreateTexture(texDesc);
 	m_waterTexture = m_device.CreateShaderResourceView(waterTex);
-	m_cubeTexture = m_device.CreateShaderResourceView(L"resources/textures/output_skybox.dds");
+	m_cubeTexture = m_device.CreateShaderResourceView(L"resources/textures/output_skybox2.dds");
 	m_kaczorTexture = m_device.CreateShaderResourceView(L"resources/duck/ducktex.jpg");
 }
 
