@@ -21,6 +21,7 @@ const float Robot::SHEET_ANGLE = DirectX::XM_PIDIV4;
 const float Robot::SHEET_SIZE = 2.0f;
 const XMFLOAT3 Robot::SHEET_POS = XMFLOAT3(0.0f, -0.5f, 0.0f);
 const XMFLOAT4 Robot::SHEET_COLOR = XMFLOAT4(1.0f, 1.0f, 1.0f, 255.0f / 255.0f);
+const float KACZOR_SIZE = 0.0015f;
 
 const float Robot::WALL_SIZE = 2.0f;
 const XMFLOAT3 Robot::WALLS_POS = XMFLOAT3(0.0f, 0.0f, 0.0f);
@@ -221,7 +222,7 @@ void mini::gk2::Robot::KaczorowyDeBoor()
 
 void mini::gk2::Robot::CreateKaczorMtx()
 {
-	m_kaczorMtx = XMMatrixScaling(0.001, 0.001, 0.001)* XMMatrixRotationAxis(XMVECTOR{ 0, -1, 0 }, std::atan2f(kaczorDirection.x, kaczorDirection.z) + g_XMPi.f[0]) * XMMatrixTranslation(kaczorPosition.z, kaczorPosition.y, kaczorPosition.x);
+	m_kaczorMtx = XMMatrixScaling(KACZOR_SIZE, KACZOR_SIZE, KACZOR_SIZE)* XMMatrixRotationAxis(XMVECTOR{ 0, -1, 0 }, std::atan2f(kaczorDirection.x, kaczorDirection.z) + g_XMPi.f[0]) * XMMatrixTranslation(kaczorPosition.z, kaczorPosition.y, kaczorPosition.x);
 }
 
 void Robot::SetTextures(std::initializer_list<ID3D11ShaderResourceView*> resList, const dx_ptr<ID3D11SamplerState>& sampler)
@@ -336,12 +337,6 @@ void Robot::GenerateHeightMap()
 {
 	auto dnorm = normalMap.data();
 
-	for (int i = 0; i < Nsize; i++) {
-		for (int j = 0; j < Nsize; j++) {
-			if (rand() % 100000 < 1 && rand() % 20 < 3)
-				heightMapOld[i][j] = 0.25f;
-		}
-	}
 	int u = (kaczorPosition.x + 1.0f) * 0.5f * (Nsize - 1);
 	int v = (kaczorPosition.z + 1.0f) * 0.5f * (Nsize - 1);
 	heightMapOld[u][v] = 0.25f;
@@ -349,34 +344,34 @@ void Robot::GenerateHeightMap()
 	constexpr float B = 2 - 4 * A;
 	for (int i = 0; i < Nsize; i++) {
 		for (int j = 0; j < Nsize; j++) {
-			float zip = 0.0f;
-			if (i >0)
-				zip += heightMapOld[i - 1][j];
-			if (j > 0)
-				zip += heightMapOld[i][j - 1];
-			if (i < Nsize - 1)
-				zip += heightMapOld[i + 1][j];
-			if (j < Nsize - 1)
-				zip += heightMapOld[i][j + 1];
+			if (rand() % 100000 < 1 && rand() % 20 < 1)
+				heightMap[i][j] = 0.25f;
+			else {
+				float zip = 0.0f;
+				if (i > 0)
+					zip += heightMapOld[i - 1][j];
+				if (j > 0)
+					zip += heightMapOld[i][j - 1];
+				if (i < Nsize - 1)
+					zip += heightMapOld[i + 1][j];
+				if (j < Nsize - 1)
+					zip += heightMapOld[i][j + 1];
 
-			heightMap[i][j] = d[i][j] * (A * zip + B * heightMapOld[i][j] - heightMap[i][j]);
-		}
-	}
+				heightMap[i][j] = d[i][j] * (A * zip + B * heightMapOld[i][j] - heightMap[i][j]);
 
-	std::swap(heightMapOld, heightMap);
-	for (int i = 0; i < Nsize; i++) {
-		for (int j = 0; j < Nsize; j++) {
+			}
+
 			float zip = 0, zim = 0, zjp = 0, zjm = 0;
 			if (i > 0)
-				zim = heightMap[i - 1][j];
+				zim = heightMapOld[i - 1][j];
 			if (j > 0)
-				zjm = heightMap[i][j - 1];
+				zjm = heightMapOld[i][j - 1];
 			if (i < Nsize - 1)
-				zip = heightMap[i + 1][j];
+				zip = heightMapOld[i + 1][j];
 			if (j < Nsize - 1)
-				zjp = heightMap[i][j + 1];
+				zjp = heightMapOld[i][j + 1];
 
-			float curr = heightMap[i][j];
+			float curr = heightMapOld[i][j];
 
 			XMVECTOR vecp = { 10,(zip - curr) / h, 0.0f };
 			XMVECTOR vecl = { -10,(zim - curr) / h , 0.0f };
@@ -397,6 +392,7 @@ void Robot::GenerateHeightMap()
 		}
 	}
 
+	std::swap(heightMapOld, heightMap);
 
 	m_device.context()->UpdateSubresource(waterTex.get(), 0, nullptr, normalMap.data(), Nsize * pixelSize, arraySize);
 	m_device.context()->GenerateMips(m_waterTexture.get());

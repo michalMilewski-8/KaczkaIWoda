@@ -35,10 +35,10 @@ PSInput main(VSInput i)
 {
 	PSInput o;
 	o.tex = i.tex;
-	o.worldPos = mul(worldMatrix, float4(i.pos, 1.0f));
+	o.worldPos = mul(worldMatrix, float4(i.pos, 1.0f)).xyz;
 	o.pos = mul(viewMatrix, float4(o.worldPos, 1.0f));
 	o.pos = mul(projMatrix, o.pos);
-	o.norm = i.norm;
+	o.norm = mul(worldMatrix, float4(i.norm, 0.0f)).xyz;
 	float3 camPos = mul(invViewMatrix, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
 	o.view = camPos - o.worldPos;
 

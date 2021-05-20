@@ -21,6 +21,9 @@
 //	Lighting lighting;
 //}
 
+static const float3 lightPos = float3(1, 0.5f, 0);
+static const float3 lightCol = float3(1, 1, 1);
+
 struct PSInput
 {
 	float4 pos : SV_POSITION;
@@ -35,28 +38,28 @@ texture2D kaczor : register(t0);
 
 float4 main(PSInput i) : SV_TARGET
 {
-	//float3 V = normalize(i.viewVec);
-	//float3 N = normalize(i.norm);
+	float3 V = normalize(i.view);
+	float3 N = normalize(i.norm);
+	float3 T = normalize(cross(N,float3(0.0f,1.0f,0.0f)));
+	T = normalize(cross(T, N));
 	//float3 col = lighting.ambient.xyz * lighting.surface.x;
-	float3 col = kaczor.Sample(samp, i.tex).rgb;
-	//col = pow(col, 0.4545f);
-	return float4(col,1.0f);
-	//float specAlpha = 0.0f;
-	//for (int k = 0; k < 3; ++k)
-	//{
-	//	Light li = lighting.lights[k];
-	//	if (li.color.w != 0)
-	//	{
-	//		float3 L = normalize(li.position.xyz - i.worldPos);
-	//		float3 H = normalize(V + L);
-	//		col += li.color.xyz * surfaceColor.xyz * lighting.surface.y * clamp(dot(N, L), 0.0f, 1.0f);
-	//		float nh = dot(N, H);
-	//		nh = clamp(nh, 0.0f, 1.0f);
-	//		nh = pow(nh, lighting.surface.w);
-	//		specAlpha += nh;
-	//		col += li.color.xyz * nh;
-	//	}
-	//}
+	float3 surfaceCol = kaczor.Sample(samp, i.tex).rgb;
+	surfaceCol = pow(surfaceCol, 0.4545f);
+
+	float3 col = surfaceCol*0.3f;
+
+	float3 L = normalize(lightPos.xyz - i.worldPos);
+	float3 H = normalize(V + L);
+	float nh = dot(T, H);
+	
+	nh = pow(nh, 2.0f);
+	nh = sqrt(1 - nh);
+	nh = clamp(nh, 0.0f, 1.0f);
+	nh = pow(nh, 50.0f);
+
+	col += lightCol.xyz * surfaceCol * nh;
+
+	return float4(col, 1.0f);
 
 	//return saturate(float4(col, surfaceColor.w + specAlpha));
 }
