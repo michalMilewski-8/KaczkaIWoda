@@ -57,7 +57,9 @@ float4 main(PSInput i) : SV_TARGET
 	nh = clamp(nh, 0.0f, 1.0f);
 	nh = pow(nh, 50.0f);
 
-	col += lightCol.xyz * surfaceCol * nh;
+	col += 0.5f * lightCol.xyz * surfaceCol * nh;
+
+	col += 0.2f * lightCol.xyz * surfaceCol * clamp(dot(L,N), 0.0f, 1.0f);;
 
 	return float4(col, 1.0f);
 
